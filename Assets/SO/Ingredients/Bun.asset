@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 396e409475e671f4da02adee2433f769, type: 3}
+  m_Name: Bun
+  m_EditorClassIdentifier: Assembly-CSharp::IngredientSO
+  ingredientName: Bun
+  icon: {fileID: 21300000, guid: c87bde41d64e2a5409a141f86813df3e, type: 3}
+  prefab: {fileID: 5838219440545619893, guid: 7a09300d314b17f4682ed2e9286ff68c, type: 3}
+  isCookable: 0
+  timeToCook: 4
+  timeToBurn: 4
+  rawColor: {r: 0.9, g: 0.4, b: 0.4, a: 1}
+  cookedColor: {r: 0.6, g: 0.3, b: 0.1, a: 1}
+  burntColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  buyPrice: 1
