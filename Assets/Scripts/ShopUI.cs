@@ -503,6 +503,19 @@ public class ShopUI : MonoBehaviour
                 }
             }
         }
+
+        // Actualizar tarjetas de mejora de tiempo de turno en la tienda
+        ShiftTimeUpgradeItemUI[] shiftTimeUpgrades = GetComponentsInChildren<ShiftTimeUpgradeItemUI>(true);
+        if (shiftTimeUpgrades != null)
+        {
+            foreach (var upgradeUI in shiftTimeUpgrades)
+            {
+                if (upgradeUI != null)
+                {
+                    upgradeUI.UpdateDisplay(currentMoney);
+                }
+            }
+        }
     }
 
     private void SubscribeEvents()

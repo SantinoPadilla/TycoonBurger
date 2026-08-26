@@ -53,24 +53,36 @@ public class CameraFollow : MonoBehaviour
     [Header("Límites del Mapa (Opcional)")]
     [Tooltip("Si está activo, restringe la posición X e Y de la cámara dentro del rectángulo de límites.")]
     [SerializeField] private bool useBounds = false;
+
+    [Tooltip("Si es true, los bordes visibles de la cámara no pasarán los límites (el marco de la pantalla respeta los bordes). Si es false, se limita solo la posición central de la cámara.")]
+    [SerializeField] private bool clampCameraEdges = true;
+
     [SerializeField] private Vector2 minBounds = new Vector2(-10f, -10f);
     [SerializeField] private Vector2 maxBounds = new Vector2(10f, 10f);
 
     private TopDownPlayerController2D playerController;
     private Rigidbody2D targetRb;
+    private Camera targetCam;
 
     private Vector3 cameraVelocity = Vector3.zero;
     private Vector2 currentLookAhead = Vector2.zero;
     private Vector2 lookAheadVelocity = Vector2.zero;
 
+    private void Awake()
+    {
+        FindCameraIfNull();
+    }
+
     private void Start()
     {
+        FindCameraIfNull();
         FindTargetIfNull();
         SnapToTarget();
     }
 
     private void OnEnable()
     {
+        FindCameraIfNull();
         FindTargetIfNull();
     }
 
@@ -176,11 +188,64 @@ public class CameraFollow : MonoBehaviour
         // 5. Aplicar límites si están activos
         if (useBounds)
         {
-            finalPos.x = Mathf.Clamp(finalPos.x, minBounds.x, maxBounds.x);
-            finalPos.y = Mathf.Clamp(finalPos.y, minBounds.y, maxBounds.y);
+            if (clampCameraEdges)
+            {
+                FindCameraIfNull();
+
+                float horizExtent = 0f;
+                float vertExtent = 0f;
+
+                if (targetCam != null)
+                {
+                    if (targetCam.orthographic)
+                    {
+                        vertExtent = targetCam.orthographicSize;
+                        horizExtent = vertExtent * targetCam.aspect;
+                    }
+                    else
+                    {
+                        float distance = Mathf.Abs(finalPos.z - targetWorldPos.z);
+                        if (Mathf.Approximately(distance, 0f)) distance = Mathf.Abs(baseOffset.z);
+                        vertExtent = distance * Mathf.Tan(targetCam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                        horizExtent = vertExtent * targetCam.aspect;
+                    }
+                }
+
+                float minX = minBounds.x + horizExtent;
+                float maxX = maxBounds.x - horizExtent;
+                float minY = minBounds.y + vertExtent;
+                float maxY = maxBounds.y - vertExtent;
+
+                if (minX > maxX)
+                    finalPos.x = (minBounds.x + maxBounds.x) * 0.5f;
+                else
+                    finalPos.x = Mathf.Clamp(finalPos.x, minX, maxX);
+
+                if (minY > maxY)
+                    finalPos.y = (minBounds.y + maxBounds.y) * 0.5f;
+                else
+                    finalPos.y = Mathf.Clamp(finalPos.y, minY, maxY);
+            }
+            else
+            {
+                finalPos.x = Mathf.Clamp(finalPos.x, minBounds.x, maxBounds.x);
+                finalPos.y = Mathf.Clamp(finalPos.y, minBounds.y, maxBounds.y);
+            }
         }
 
         return finalPos;
+    }
+
+    private void FindCameraIfNull()
+    {
+        if (targetCam == null)
+        {
+            targetCam = GetComponent<Camera>();
+            if (targetCam == null)
+            {
+                targetCam = Camera.main;
+            }
+        }
     }
 
     private void FindTargetIfNull()
@@ -239,6 +304,27 @@ public class CameraFollow : MonoBehaviour
             Vector3 center = new Vector3((minBounds.x + maxBounds.x) * 0.5f, (minBounds.y + maxBounds.y) * 0.5f, transform.position.z);
             Vector3 size = new Vector3(maxBounds.x - minBounds.x, maxBounds.y - minBounds.y, 0.1f);
             Gizmos.DrawWireCube(center, size);
+
+            if (clampCameraEdges)
+            {
+                Camera gCam = targetCam != null ? targetCam : GetComponent<Camera>();
+                if (gCam == null) gCam = Camera.main;
+
+                if (gCam != null)
+                {
+                    float vertExtent = gCam.orthographic ? gCam.orthographicSize : (Mathf.Abs(baseOffset.z) * Mathf.Tan(gCam.fieldOfView * 0.5f * Mathf.Deg2Rad));
+                    float horizExtent = vertExtent * gCam.aspect;
+
+                    float innerWidth = (maxBounds.x - minBounds.x) - (2f * horizExtent);
+                    float innerHeight = (maxBounds.y - minBounds.y) - (2f * vertExtent);
+
+                    if (innerWidth > 0 && innerHeight > 0)
+                    {
+                        Gizmos.color = Color.yellow;
+                        Gizmos.DrawWireCube(center, new Vector3(innerWidth, innerHeight, 0.1f));
+                    }
+                }
+            }
         }
     }
 }

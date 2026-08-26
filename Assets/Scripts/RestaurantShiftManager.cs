@@ -19,11 +19,8 @@ public class RestaurantShiftManager : MonoBehaviour
     public static RestaurantShiftManager Instance => instance;
 
     [Header("Configuración de Turno")]
-    [Tooltip("Duración base en segundos para el primer turno/servicio del restaurante (Día 1).")]
+    [Tooltip("Duración base en segundos para el turno/servicio del restaurante.")]
     [SerializeField] private float shiftDuration = 30f;
-
-    [Tooltip("Tiempo en segundos que se suma progresivamente a la duración de cada servicio por cada día completado (Ej. Día 1: 30s, Día 2: +10s = 40s, Día 3: 50s...).")]
-    [SerializeField] private float timeIncrementPerDay = 10f;
 
     [Tooltip("Si es true, el primer turno comenzará automáticamente al iniciar la escena.")]
     [SerializeField] private bool autoStartFirstShift = true;
@@ -52,19 +49,16 @@ public class RestaurantShiftManager : MonoBehaviour
     public bool IsOpen => currentState == RestaurantState.Open;
     public bool IsClosed => currentState == RestaurantState.Closed;
     public float RemainingTime => Mathf.Max(0f, shiftTimer);
-    public float ShiftDuration => GetShiftDurationForDay(currentShiftNumber > 0 ? currentShiftNumber : 1);
-    public float TimeIncrementPerDay => timeIncrementPerDay;
+    public float ShiftDuration => shiftDuration + ShiftTimeUpgradeItemUI.CurrentBonusTime;
     public int CurrentShiftNumber => currentShiftNumber;
     public ShiftSummaryData LastShiftSummary => currentShiftSummary;
 
     /// <summary>
-    /// Calcula la duración total en segundos para un determinado número de servicio/día.
-    /// Para el Día 1 devuelve la duración base; para cada día posterior añade timeIncrementPerDay segundos.
+    /// Calcula la duración total en segundos para el servicio (duración base + mejora de tiempo comprada).
     /// </summary>
     public float GetShiftDurationForDay(int dayNumber)
     {
-        int dayIndex = Mathf.Max(1, dayNumber) - 1;
-        return shiftDuration + (dayIndex * timeIncrementPerDay);
+        return ShiftDuration;
     }
 
     private void Awake()
@@ -123,7 +117,7 @@ public class RestaurantShiftManager : MonoBehaviour
         // Reiniciar estadísticas para el nuevo servicio
         currentShiftSummary.Reset(currentShiftNumber);
 
-        Debug.Log($"[RestaurantShiftManager] ¡Restaurante ABIERTO! Iniciando servicio #{currentShiftNumber} ({activeShiftDuration}s - Base: {shiftDuration}s, Incremento por Día: {(currentShiftNumber - 1) * timeIncrementPerDay}s).");
+        Debug.Log($"[RestaurantShiftManager] ¡Restaurante ABIERTO! Iniciando servicio #{currentShiftNumber} ({activeShiftDuration}s - Base: {shiftDuration}s, Bonus Mejora: {ShiftTimeUpgradeItemUI.CurrentBonusTime}s).");
 
         if (shopUI != null && shopUI.IsOpen)
         {
