@@ -24,13 +24,6 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     [SerializeField] private float assemblyTime = 3f;
     [SerializeField] private float maxInteractionDistance = 2f;
 
-    [Header("Configuración de Mejoras")]
-    [Tooltip("Tiempo de armado reducido en segundos al desbloquear el Nivel 1 de mejora (modificable en el Inspector).")]
-    [SerializeField] private float upgradedAssemblyTime = 1.5f;
-
-    [Tooltip("Si es verdadero (Nivel 2 de mejora), el ensamblado se realiza automáticamente al recibir el ingrediente carne cocida.")]
-    [SerializeField] private bool autoAssembleOnPattyReceived = false;
-
     [Header("Slot de Entrada (Carne Cocinada Acumulable)")]
     [Tooltip("Slot/Transform asignado en el Inspector a donde se colocarán y acumularán las carnes cocinadas apiladas antes de armar.")]
     [SerializeField] private Transform cookedPattyInputSlot;
@@ -52,6 +45,9 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     private float currentAssemblyTimer = 0f;
     private int currentUpgradeLevel = 0;
     private StationInputSlot inputSlotComponent;
+    private bool isSpeedBoostActive = false;
+    private float upgradedAssemblyTime = 1.5f;
+    private bool autoAssembleOnPattyReceived = false;
 
     public bool HasIngredientsOnTable => placedPatty != null && hasBun;
     public bool IsCompleted => completedBurgerObj != null;
@@ -62,7 +58,7 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     public float UpgradedAssemblyTime { get => upgradedAssemblyTime; set => upgradedAssemblyTime = value; }
     public bool AutoAssembleOnPattyReceived { get => autoAssembleOnPattyReceived; set => autoAssembleOnPattyReceived = value; }
     public int CurrentUpgradeLevel => currentUpgradeLevel;
-    public float EffectiveAssemblyTime => (currentUpgradeLevel >= 1 || upgradedAssemblyTime < assemblyTime && currentUpgradeLevel > 0) ? upgradedAssemblyTime : (currentUpgradeLevel >= 1 ? upgradedAssemblyTime : assemblyTime);
+    public float EffectiveAssemblyTime => isSpeedBoostActive ? upgradedAssemblyTime : assemblyTime;
 
     /// <summary>
     /// Cantidad de productos acumulados actualmente en el slot de destino.
@@ -73,17 +69,24 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     public IngredientSO RequiredBun => recipeSO != null ? recipeSO.RequiredBunIngredient : null;
 
     /// <summary>
-    /// Aplica el nivel de mejora a la mesa de armado.
-    /// Nivel 1: Tiempo de armado reducido.
-    /// Nivel 2: Tiempo de armado reducido y armado automático al recibir el ingrediente carne cocida.
+    /// Aplica el conjunto de características activas configuradas en MesaDeArmadoUpgradeItemUI.
+    /// </summary>
+    public void SetUpgradeFeatures(System.Collections.Generic.HashSet<MesaDeArmadoUpgradeFeature> activeFeatures, float customUpgradedAssemblyTime = 1.5f)
+    {
+        if (activeFeatures == null) return;
+        isSpeedBoostActive = activeFeatures.Contains(MesaDeArmadoUpgradeFeature.ReduccionTiempoArmado);
+        autoAssembleOnPattyReceived = activeFeatures.Contains(MesaDeArmadoUpgradeFeature.EnsambladoAutomatico);
+        upgradedAssemblyTime = customUpgradedAssemblyTime;
+    }
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la mesa de armado (Compatibilidad por defecto).
     /// </summary>
     public void SetUpgradeLevel(int level)
     {
         currentUpgradeLevel = Mathf.Max(0, level);
-        if (currentUpgradeLevel >= 2)
-        {
-            autoAssembleOnPattyReceived = true;
-        }
+        isSpeedBoostActive = (currentUpgradeLevel >= 1);
+        autoAssembleOnPattyReceived = (currentUpgradeLevel >= 2);
     }
 
     private void Awake()
@@ -234,7 +237,7 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
 
         if (HasIngredientsOnTable && !IsCompleted)
         {
-            float targetAssemblyTime = (currentUpgradeLevel >= 1) ? upgradedAssemblyTime : assemblyTime;
+            float targetAssemblyTime = EffectiveAssemblyTime;
 
             // Nivel 2: Armado automático al recibir la carne cocida
             if (autoAssembleOnPattyReceived || currentUpgradeLevel >= 2)

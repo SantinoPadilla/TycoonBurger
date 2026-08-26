@@ -1,22 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[System.Serializable]
-public struct DayCustomerLimit
-{
-    [Tooltip("Día/Servicio a partir del cual aplica este límite.")]
-    public int dayNumber;
-
-    [Tooltip("Máximo número de clientes simultáneos permitidos a partir de este día.")]
-    public int maxConcurrentCustomers;
-
-    public DayCustomerLimit(int dayNumber, int maxConcurrentCustomers)
-    {
-        this.dayNumber = dayNumber;
-        this.maxConcurrentCustomers = maxConcurrentCustomers;
-    }
-}
-
 /// <summary>
 /// Gestor y generador (Spawner) de clientes.
 /// Administra el tiempo entre apariciones, asigna puntos de espera disponibles frente al mostrador
@@ -46,16 +30,8 @@ public class CustomerSpawner : MonoBehaviour
     [Tooltip("Tiempo en segundos entre la aparición de cada cliente.")]
     [SerializeField] private float spawnInterval = 5f;
 
-    [Tooltip("Paciencia inicial en segundos asignada a los clientes.")]
-    [SerializeField] private float customerPatienceTime = 25f;
-
-    [Tooltip("Máximo número de clientes simultáneos permitidos en pantalla (usado como fallback si customerLimitsByDay está vacío).")]
+    [Tooltip("Máximo número de clientes simultáneos permitidos en pantalla.")]
     [SerializeField] private int maxConcurrentCustomers = 3;
-
-    [Header("Progreso de Clientes por Día")]
-    [Tooltip("Reglas para escalar la cantidad máxima de clientes simultáneos según el número de día/turno.\n" +
-             "Ejemplo: Día 1 -> 1 cliente, Día 10 -> 2 clientes, Día 15 -> 3 clientes.")]
-    [SerializeField] private List<DayCustomerLimit> customerLimitsByDay = new List<DayCustomerLimit>();
 
     [Tooltip("Si es true, los clientes aparecerán automáticamente al iniciar la escena.")]
     [SerializeField] private bool autoSpawn = true;
@@ -64,58 +40,38 @@ public class CustomerSpawner : MonoBehaviour
     private HashSet<Transform> occupiedSpots = new HashSet<Transform>();
     private float spawnTimer = 0f;
 
+    private int? overrideMaxConcurrentCustomers = null;
+    private float? overrideSpawnInterval = null;
+
     public int ActiveCustomerCount => activeCustomers.Count;
     public bool AutoSpawn { get => autoSpawn; set => autoSpawn = value; }
 
     /// <summary>
-    /// Obtiene la cantidad máxima de clientes simultáneos activa para el día actual.
+    /// Tiempo actual en segundos entre la aparición de cada cliente (considera mejoras aplicadas).
     /// </summary>
-    public int CurrentMaxConcurrentCustomers
+    public float CurrentSpawnInterval => overrideSpawnInterval.HasValue ? overrideSpawnInterval.Value : spawnInterval;
+
+    /// <summary>
+    /// Obtiene la cantidad máxima de clientes simultáneos activa o según mejoras aplicadas.
+    /// </summary>
+    public int CurrentMaxConcurrentCustomers => overrideMaxConcurrentCustomers.HasValue ? overrideMaxConcurrentCustomers.Value : maxConcurrentCustomers;
+
+    /// <summary>
+    /// Establece los valores modificados de la mejora de clientes (máximo número simultáneo e intervalo de generación).
+    /// </summary>
+    public void SetUpgradeCustomerLimits(int maxConcurrent, float interval)
     {
-        get
-        {
-            int currentDay = RestaurantShiftManager.Instance != null ? RestaurantShiftManager.Instance.CurrentShiftNumber : 1;
-            return GetMaxConcurrentCustomersForDay(currentDay);
-        }
+        overrideMaxConcurrentCustomers = maxConcurrent;
+        overrideSpawnInterval = Mathf.Max(0.1f, interval);
     }
 
     /// <summary>
-    /// Calcula la cantidad máxima de clientes simultáneos para un día específico según las reglas configuradas.
+    /// Restablece los valores del spawner a su configuración base de la escena.
     /// </summary>
-    public int GetMaxConcurrentCustomersForDay(int dayNumber)
+    public void ClearUpgradeCustomerLimits()
     {
-        if (customerLimitsByDay == null || customerLimitsByDay.Count == 0)
-        {
-            return maxConcurrentCustomers;
-        }
-
-        int targetDay = Mathf.Max(1, dayNumber);
-        int effectiveLimit = maxConcurrentCustomers;
-        int bestMatchingDay = -1;
-
-        foreach (var rule in customerLimitsByDay)
-        {
-            if (rule.dayNumber <= targetDay && rule.dayNumber > bestMatchingDay)
-            {
-                bestMatchingDay = rule.dayNumber;
-                effectiveLimit = rule.maxConcurrentCustomers;
-            }
-        }
-
-        if (bestMatchingDay == -1)
-        {
-            int minDay = int.MaxValue;
-            foreach (var rule in customerLimitsByDay)
-            {
-                if (rule.dayNumber < minDay)
-                {
-                    minDay = rule.dayNumber;
-                    effectiveLimit = rule.maxConcurrentCustomers;
-                }
-            }
-        }
-
-        return effectiveLimit;
+        overrideMaxConcurrentCustomers = null;
+        overrideSpawnInterval = null;
     }
 
     /// <summary>
@@ -124,7 +80,7 @@ public class CustomerSpawner : MonoBehaviour
     public void StartSpawning()
     {
         autoSpawn = true;
-        spawnTimer = spawnInterval;
+        spawnTimer = CurrentSpawnInterval;
     }
 
     /// <summary>
@@ -176,7 +132,7 @@ public class CustomerSpawner : MonoBehaviour
         autoSpawn = enabled;
         if (enabled)
         {
-            spawnTimer = spawnInterval;
+            spawnTimer = CurrentSpawnInterval;
         }
     }
 
@@ -195,12 +151,23 @@ public class CustomerSpawner : MonoBehaviour
         }
         activeCustomers.Clear();
         occupiedSpots.Clear();
+
+        // Buscar y retirar cualquier otro cliente existente en la escena
+        Customer[] allCustomers = FindObjectsByType<Customer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Customer customer in allCustomers)
+        {
+            if (customer != null)
+            {
+                customer.ForceLeaveImmediately();
+            }
+        }
+
         Debug.Log("[CustomerSpawner] Se ha ordenado la retirada de todos los clientes activos.");
     }
 
     private void Start()
     {
-        spawnTimer = spawnInterval;
+        spawnTimer = CurrentSpawnInterval;
     }
 
     private void Update()
@@ -210,7 +177,7 @@ public class CustomerSpawner : MonoBehaviour
         spawnTimer -= Time.deltaTime;
         if (spawnTimer <= 0f)
         {
-            spawnTimer = spawnInterval;
+            spawnTimer = CurrentSpawnInterval;
             TrySpawnCustomer();
         }
     }
@@ -251,7 +218,6 @@ public class CustomerSpawner : MonoBehaviour
                 availableProducts,
                 freeSpot,
                 exitPoint,
-                customerPatienceTime,
                 OnCustomerLeft
             );
 

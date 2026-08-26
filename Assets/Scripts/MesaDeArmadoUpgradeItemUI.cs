@@ -2,17 +2,33 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
+public enum MesaDeArmadoUpgradeFeature
+{
+    ReduccionTiempoArmado,
+    EnsambladoAutomatico
+}
+
 /// <summary>
 /// Componente de UI dedicado exclusivamente para las mejoras de la Mesa de Armado (MesaDeArmado) en el panel 'MejorasPanel'.
-/// Administra el nivel alcanzado y activa las capacidades asociadas:
-/// Nivel 1: Reduce el tiempo de armado del producto (configurable en Inspector en MesaDeArmado).
-/// Nivel 2: Activa el ensamblado automático al colocar el ingrediente carne cocida en la mesa.
+/// Administra el nivel alcanzado y activa las capacidades según el orden configurado en el Inspector.
 /// </summary>
 public class MesaDeArmadoUpgradeItemUI : MonoBehaviour
 {
     [Header("Configuración de la Mejora (ScriptableObject)")]
     [Tooltip("ScriptableObject de datos de la mejora de la Mesa de Armado (ej. Upgrade_MesaArmado).")]
     [SerializeField] private UpgradeDataSO upgradeData;
+
+    [Header("Orden de Mejoras (Configurable en Inspector)")]
+    [Tooltip("Orden en el que se desbloquean las mejoras de la mesa de armado (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
+    [SerializeField] private System.Collections.Generic.List<MesaDeArmadoUpgradeFeature> upgradeOrder = new System.Collections.Generic.List<MesaDeArmadoUpgradeFeature>()
+    {
+        MesaDeArmadoUpgradeFeature.ReduccionTiempoArmado,
+        MesaDeArmadoUpgradeFeature.EnsambladoAutomatico
+    };
+
+    [Header("Parámetros de Mejora")]
+    [Tooltip("Tiempo de armado reducido en segundos al desbloquear la mejora de velocidad (ej. 1.5 s).")]
+    [SerializeField] private float upgradedAssemblyTime = 1.5f;
 
     [Header("Estación Mesa de Armado en Cocina")]
     [Tooltip("Estación o componente MesaDeArmado al que se le aplicarán los niveles de mejora.")]
@@ -40,6 +56,7 @@ public class MesaDeArmadoUpgradeItemUI : MonoBehaviour
     [SerializeField] private Text uiButtonText;
 
     public UpgradeDataSO UpgradeData => upgradeData;
+    public System.Collections.Generic.List<MesaDeArmadoUpgradeFeature> UpgradeOrder => upgradeOrder;
 
     private void Awake()
     {
@@ -122,14 +139,24 @@ public class MesaDeArmadoUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Activa o desactiva la lógica de mejoras en el script MesaDeArmado según el nivel alcanzado.
+    /// Activa o desactiva la lógica de mejoras en el script MesaDeArmado según las mejoras activas en 'upgradeOrder'.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
+        System.Collections.Generic.HashSet<MesaDeArmadoUpgradeFeature> activeFeatures = new System.Collections.Generic.HashSet<MesaDeArmadoUpgradeFeature>();
+        if (upgradeOrder != null)
+        {
+            int unlockedCount = Mathf.Clamp(currentLevel, 0, upgradeOrder.Count);
+            for (int i = 0; i < unlockedCount; i++)
+            {
+                activeFeatures.Add(upgradeOrder[i]);
+            }
+        }
+
         MesaDeArmado station = (mesaStation != null) ? mesaStation : FindFirstObjectByType<MesaDeArmado>(FindObjectsInactive.Include);
         if (station != null)
         {
-            station.SetUpgradeLevel(currentLevel);
+            station.SetUpgradeFeatures(activeFeatures, upgradedAssemblyTime);
         }
     }
 

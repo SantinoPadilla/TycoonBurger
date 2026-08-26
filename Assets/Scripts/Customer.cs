@@ -68,12 +68,10 @@ public class Customer : MonoBehaviour, IInteractable
         List<ProductSO> availableProducts,
         Transform waitingSpot,
         Transform exitPoint,
-        float patienceTime,
         System.Action<Customer, Transform> onLeftCallback)
     {
         targetWaitingSpot = waitingSpot;
         targetExitPoint = exitPoint;
-        maxPatienceTime = patienceTime > 0f ? patienceTime : maxPatienceTime;
         onCustomerLeftCallback = onLeftCallback;
 
         GenerateRandomOrder(availableProducts);

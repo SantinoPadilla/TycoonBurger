@@ -10,18 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 39b5867cdcdcdfd46a38ab2fd1c79e05, type: 3}
-  m_Name: Profit
+  m_Name: SodaStacion
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDataSO
-  upgradeId: Profit
-  upgradeName: Profit
+  upgradeId: Soda Stacion
+  upgradeName: Soda Stacion
   icon: {fileID: 0}
   levels:
   - levelNumber: 1
-    price: 10
-    description: 
+    price: 250
+    description: unlock soda stacion
   - levelNumber: 2
-    price: 20
-    description: 
-  - levelNumber: 3
-    price: 30
-    description: 
+    price: 300
+    description: facilita el QTE

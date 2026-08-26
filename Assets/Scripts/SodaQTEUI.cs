@@ -32,18 +32,12 @@ public class SodaQTEUI : MonoBehaviour
     [SerializeField] private float minSpeed = 0.4f;
 
     [Header("Configuración de Zona Verde")]
-    [Tooltip("Proporción del ancho de la barra ocupado por el centro verde (ej. 0.2 = 20% del ancho).")]
+    [Tooltip("Proporción del ancho de la barra ocupado por el centro verde por defecto (ej. 0.2 = 20% del ancho).")]
     [Range(0.05f, 0.6f)]
     [SerializeField] private float greenCenterRatio = 0.2f;
 
-    [Header("Configuración de Mejoras")]
-    [Tooltip("Proporción ampliada de la zona verde de éxito del QTE al activar la mejora (ej. 0.35 = 35% del ancho de la barra). Modificable en el Inspector.")]
-    [Range(0.05f, 0.8f)]
-    [SerializeField] private float upgradedGreenCenterRatio = 0.35f;
-
-    [Tooltip("Si es verdadero, activa la zona verde ampliada del QTE (ideal para pruebas en el Inspector).")]
-    [SerializeField] private bool useUpgradedGreenZone = false;
-
+    private float upgradedGreenCenterRatio = 0.35f;
+    private bool useUpgradedGreenZone = false;
     private float currentSpeed;
     private float normalizedPos = 0f; // 0 = extremo izquierdo, 1 = extremo derecho
     private bool movingRight = true;
@@ -57,8 +51,7 @@ public class SodaQTEUI : MonoBehaviour
     public float EffectiveGreenCenterRatio => (useUpgradedGreenZone || currentUpgradeLevel >= 2) ? upgradedGreenCenterRatio : greenCenterRatio;
 
     /// <summary>
-    /// Aplica el nivel de mejora al QTE de la estación de soda.
-    /// Nivel 2: Agranda la zona de éxito del centro verde.
+    /// Aplica el nivel de mejora al QTE de la estación de soda (Compatibilidad por defecto).
     /// </summary>
     public void SetUpgradeLevel(int level)
     {

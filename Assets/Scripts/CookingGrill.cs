@@ -34,16 +34,12 @@ public class CookingGrill : MonoBehaviour, IInteractable
     [Tooltip("Desplazamiento vertical entre productos apilados en el slot de salida.")]
     [SerializeField] private Vector3 outputSlotStackOffset = new Vector3(0f, 0.4f, 0f);
 
-    [Header("Configuración de Mejoras")]
-    [Tooltip("Multiplicador de velocidad de cocción al activar la mejora de reducción de tiempo (ej. 1.5 = 50% más rápido). Modificable en el Inspector.")]
-    [SerializeField] private float cookSpeedMultiplier = 1.5f;
-
-    [Tooltip("Si es verdadero, al estar la hamburguesa cocinada (Cooked) se moverá automáticamente al slot de ingredientes acumulados.")]
-    [SerializeField] private bool autoRemoveCooked = false;
-
     private ICookable ingredient1;
     private ICookable ingredient2;
     private int currentUpgradeLevel = 0;
+    private bool isSpeedBoostActive = false;
+    private float cookSpeedMultiplier = 1.5f;
+    private bool autoRemoveCooked = false;
 
     public bool IsSlot1Occupied => ingredient1 != null;
     public bool IsSlot2Occupied => ingredient2 != null;
@@ -52,7 +48,7 @@ public class CookingGrill : MonoBehaviour, IInteractable
     public float CookSpeedMultiplier { get => cookSpeedMultiplier; set => cookSpeedMultiplier = value; }
     public bool AutoRemoveCooked { get => autoRemoveCooked; set => autoRemoveCooked = value; }
     public int CurrentUpgradeLevel => currentUpgradeLevel;
-    public float EffectiveCookSpeedMultiplier => (currentUpgradeLevel >= 2) ? cookSpeedMultiplier : 1.0f;
+    public float EffectiveCookSpeedMultiplier => isSpeedBoostActive ? cookSpeedMultiplier : 1.0f;
 
     /// <summary>
     /// Cantidad de productos acumulados actualmente en el slot de destino.
@@ -62,19 +58,26 @@ public class CookingGrill : MonoBehaviour, IInteractable
     public GameObject EffectivePrefab => (ingredientSO != null && ingredientSO.Prefab != null) ? ingredientSO.Prefab : burgerPrefab;
 
     /// <summary>
-    /// Aplica el nivel de mejora a la plancha de cocina.
-    /// Nivel 1: Activa el slot 2.
-    /// Nivel 2: Reduce el tiempo de cocción (cookSpeedMultiplier).
-    /// Nivel 3: Activa el retirado automático al slot de productos acumulados.
+    /// Aplica el conjunto de características activas configuradas en PlanchaUpgradeItemUI.
+    /// </summary>
+    public void SetUpgradeFeatures(System.Collections.Generic.HashSet<PlanchaUpgradeFeature> activeFeatures, float customSpeedMultiplier = 1.5f)
+    {
+        if (activeFeatures == null) return;
+        enableSlot2 = activeFeatures.Contains(PlanchaUpgradeFeature.SegundoSlot);
+        isSpeedBoostActive = activeFeatures.Contains(PlanchaUpgradeFeature.VelocidadCoccion);
+        autoRemoveCooked = activeFeatures.Contains(PlanchaUpgradeFeature.RetiradoAutomatico);
+        cookSpeedMultiplier = customSpeedMultiplier;
+    }
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la plancha de cocina (Compatibilidad por defecto).
     /// </summary>
     public void SetUpgradeLevel(int level)
     {
         currentUpgradeLevel = Mathf.Max(0, level);
         enableSlot2 = (currentUpgradeLevel >= 1);
-        if (currentUpgradeLevel >= 3)
-        {
-            autoRemoveCooked = true;
-        }
+        isSpeedBoostActive = (currentUpgradeLevel >= 2);
+        autoRemoveCooked = (currentUpgradeLevel >= 3);
     }
 
     private void Awake()

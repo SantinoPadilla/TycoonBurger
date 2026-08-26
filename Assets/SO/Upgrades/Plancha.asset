@@ -10,15 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 39b5867cdcdcdfd46a38ab2fd1c79e05, type: 3}
-  m_Name: MesaDeArmado
+  m_Name: Plancha
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDataSO
-  upgradeId: MesaDeArmado
-  upgradeName: Mejora de Mesa de armado
+  upgradeId: Plancha
+  upgradeName: Grill
   icon: {fileID: 0}
   levels:
   - levelNumber: 1
-    price: 100
-    description: reduc el tiempp de armado
+    price: 25
+    description: unlock new grill slot
   - levelNumber: 2
-    price: 200
-    description: contrata un armado
+    price: 75
+    description: reduce el tiempo de coccion
+  - levelNumber: 3
+    price: 125
+    description: retira automaticamente los ingrediente cocidos

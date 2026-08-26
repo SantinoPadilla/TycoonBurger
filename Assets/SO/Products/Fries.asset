@@ -15,7 +15,7 @@ MonoBehaviour:
   productName: Fires
   icon: {fileID: 21300000, guid: 106cd22691d163c448e3738475b5fabe, type: 3}
   resultPrefab: {fileID: 1017418057188483527, guid: 3c4deef84de15f742b29060594e8dcb4, type: 3}
-  sellPrice: 17
+  sellPrice: 35
   requiresAssembly: 0
   assemblyTime: 0
   requiredIngredients:

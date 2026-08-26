@@ -23,14 +23,9 @@ public class PlayerCapacityUpgradeItemUI : MonoBehaviour
     [Tooltip("Capacidad por defecto en Nivel 0 (sin mejoras).")]
     [SerializeField] private int defaultCapacity = 1;
 
-    [Tooltip("Cantidad de ítems máximos a llevar en Nivel 1.")]
-    [SerializeField] private int level1Capacity = 2;
-
-    [Tooltip("Cantidad de ítems máximos a llevar en Nivel 2.")]
-    [SerializeField] private int level2Capacity = 3;
-
-    [Tooltip("Cantidad de ítems máximos a llevar en Nivel 3.")]
-    [SerializeField] private int level3Capacity = 4;
+    [Header("Orden de Capacidad Máxima por Nivel")]
+    [Tooltip("Lista de capacidad máxima asignada según el nivel alcanzado (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
+    [SerializeField] private System.Collections.Generic.List<int> capacitySteps = new System.Collections.Generic.List<int>() { 2, 3, 4 };
 
     [Header("Referencias Visuales UI")]
     [SerializeField] private Image iconImage;
@@ -54,6 +49,7 @@ public class PlayerCapacityUpgradeItemUI : MonoBehaviour
     [SerializeField] private Text uiButtonText;
 
     public UpgradeDataSO UpgradeData => upgradeData;
+    public System.Collections.Generic.List<int> CapacitySteps => capacitySteps;
 
     private void Awake()
     {
@@ -136,7 +132,7 @@ public class PlayerCapacityUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Aplica el límite de capacidad de carga a PlayerCarrySystem según el nivel alcanzado.
+    /// Aplica el límite de capacidad de carga a PlayerCarrySystem según la lista 'capacitySteps'.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
@@ -144,18 +140,10 @@ public class PlayerCapacityUpgradeItemUI : MonoBehaviour
         if (carrySystem == null) return;
 
         int targetCapacity = defaultCapacity;
-        switch (currentLevel)
+        if (currentLevel > 0 && capacitySteps != null && capacitySteps.Count > 0)
         {
-            case 1:
-                targetCapacity = level1Capacity;
-                break;
-            case 2:
-                targetCapacity = level2Capacity;
-                break;
-            case 3:
-            default:
-                if (currentLevel >= 3) targetCapacity = level3Capacity;
-                break;
+            int index = Mathf.Clamp(currentLevel - 1, 0, capacitySteps.Count - 1);
+            targetCapacity = capacitySteps[index];
         }
 
         carrySystem.SetMaxCapacity(targetCapacity);

@@ -19,15 +19,9 @@ public class PlayerSpeedUpgradeItemUI : MonoBehaviour
     [Tooltip("Controlador del jugador al cual aplicar el incremento de velocidad. Si está vacío, se buscará en la escena.")]
     [SerializeField] private TopDownPlayerController2D playerController;
 
-    [Header("Valores de Incremento de Velocidad por Nivel")]
-    [Tooltip("Valor de velocidad adicional sumado a la velocidad base en Nivel 1.")]
-    [SerializeField] private float level1SpeedBonus = 1.5f;
-
-    [Tooltip("Valor de velocidad adicional sumado a la velocidad base en Nivel 2.")]
-    [SerializeField] private float level2SpeedBonus = 3.0f;
-
-    [Tooltip("Valor de velocidad adicional sumado a la velocidad base en Nivel 3.")]
-    [SerializeField] private float level3SpeedBonus = 4.5f;
+    [Header("Orden de Incrementos de Velocidad por Nivel")]
+    [Tooltip("Lista de valores de velocidad adicional aplicados según el nivel alcanzado (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
+    [SerializeField] private System.Collections.Generic.List<float> speedBonusSteps = new System.Collections.Generic.List<float>() { 1.5f, 3.0f, 4.5f };
 
     [Header("Referencias Visuales UI")]
     [SerializeField] private Image iconImage;
@@ -51,6 +45,7 @@ public class PlayerSpeedUpgradeItemUI : MonoBehaviour
     [SerializeField] private Text uiButtonText;
 
     public UpgradeDataSO UpgradeData => upgradeData;
+    public System.Collections.Generic.List<float> SpeedBonusSteps => speedBonusSteps;
 
     private void Awake()
     {
@@ -133,7 +128,7 @@ public class PlayerSpeedUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Aplica el incremento de velocidad al componente TopDownPlayerController2D según el nivel alcanzado.
+    /// Aplica el incremento de velocidad al componente TopDownPlayerController2D según la lista 'speedBonusSteps'.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
@@ -141,18 +136,10 @@ public class PlayerSpeedUpgradeItemUI : MonoBehaviour
         if (player == null) return;
 
         float bonus = 0f;
-        switch (currentLevel)
+        if (currentLevel > 0 && speedBonusSteps != null && speedBonusSteps.Count > 0)
         {
-            case 1:
-                bonus = level1SpeedBonus;
-                break;
-            case 2:
-                bonus = level2SpeedBonus;
-                break;
-            case 3:
-            default:
-                if (currentLevel >= 3) bonus = level3SpeedBonus;
-                break;
+            int index = Mathf.Clamp(currentLevel - 1, 0, speedBonusSteps.Count - 1);
+            bonus = speedBonusSteps[index];
         }
 
         player.SetSpeedBonus(bonus);

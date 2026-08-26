@@ -43,16 +43,12 @@ public class Freidora : MonoBehaviour, IInteractable
     [Header("Inventario Global / Auto-Carga")]
     [SerializeField] private bool useGlobalInventory = true;
 
-    [Header("Configuración de Mejoras")]
-    [Tooltip("Multiplicador de velocidad de fritura al activar la mejora de reducción de tiempo (ej. 1.5 = 50% más rápido). Modificable en el Inspector.")]
-    [SerializeField] private float cookSpeedMultiplier = 1.5f;
-
-    [Tooltip("Si es verdadero, al estar las papas doradas (Cooked) se transfieren automáticamente como Papas Fritas al slot de ingredientes acumulados.")]
-    [SerializeField] private bool autoRemoveCooked = false;
-
     private ICookable item1;
     private ICookable item2;
     private int currentUpgradeLevel = 0;
+    private bool isSpeedBoostActive = false;
+    private float cookSpeedMultiplier = 1.5f;
+    private bool autoRemoveCooked = false;
 
     public bool IsSlot1Occupied => item1 != null;
     public bool IsSlot2Occupied => item2 != null;
@@ -61,7 +57,7 @@ public class Freidora : MonoBehaviour, IInteractable
     public float CookSpeedMultiplier { get => cookSpeedMultiplier; set => cookSpeedMultiplier = value; }
     public bool AutoRemoveCooked { get => autoRemoveCooked; set => autoRemoveCooked = value; }
     public int CurrentUpgradeLevel => currentUpgradeLevel;
-    public float EffectiveCookSpeedMultiplier => (currentUpgradeLevel >= 3) ? cookSpeedMultiplier : 1.0f;
+    public float EffectiveCookSpeedMultiplier => isSpeedBoostActive ? cookSpeedMultiplier : 1.0f;
 
     /// <summary>
     /// Cantidad de productos acumulados actualmente en el slot de destino.
@@ -72,20 +68,26 @@ public class Freidora : MonoBehaviour, IInteractable
     public GameObject EffectiveResultPrefab => (cookedProductSO != null && cookedProductSO.ResultPrefab != null) ? cookedProductSO.ResultPrefab : friesProductPrefab;
 
     /// <summary>
-    /// Aplica el nivel de mejora a la freidora.
-    /// Nivel 1: Desbloquea la freidora (manejado en UI).
-    /// Nivel 2: Activa el slot 2.
-    /// Nivel 3: Reduce el tiempo de fritura/cocción (cookSpeedMultiplier).
-    /// Nivel 4: Activa el retirado automático al slot de productos acumulados.
+    /// Aplica el conjunto de características activas configuradas en FreidoraUpgradeItemUI.
+    /// </summary>
+    public void SetUpgradeFeatures(System.Collections.Generic.HashSet<FreidoraUpgradeFeature> activeFeatures, float customSpeedMultiplier = 1.5f)
+    {
+        if (activeFeatures == null) return;
+        enableSlot2 = activeFeatures.Contains(FreidoraUpgradeFeature.SegundoSlot);
+        isSpeedBoostActive = activeFeatures.Contains(FreidoraUpgradeFeature.VelocidadFritura);
+        autoRemoveCooked = activeFeatures.Contains(FreidoraUpgradeFeature.RetiradoAutomatico);
+        cookSpeedMultiplier = customSpeedMultiplier;
+    }
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la freidora (Compatibilidad por defecto).
     /// </summary>
     public void SetUpgradeLevel(int level)
     {
         currentUpgradeLevel = Mathf.Max(0, level);
         enableSlot2 = (currentUpgradeLevel >= 2);
-        if (currentUpgradeLevel >= 4)
-        {
-            autoRemoveCooked = true;
-        }
+        isSpeedBoostActive = (currentUpgradeLevel >= 3);
+        autoRemoveCooked = (currentUpgradeLevel >= 4);
     }
 
     private void Awake()

@@ -490,6 +490,19 @@ public class ShopUI : MonoBehaviour
                 }
             }
         }
+
+        // Actualizar tarjetas de mejora de flujo de clientes en la tienda
+        CustomerUpgradeItemUI[] customerUpgrades = GetComponentsInChildren<CustomerUpgradeItemUI>(true);
+        if (customerUpgrades != null)
+        {
+            foreach (var upgradeUI in customerUpgrades)
+            {
+                if (upgradeUI != null)
+                {
+                    upgradeUI.UpdateDisplay(currentMoney);
+                }
+            }
+        }
     }
 
     private void SubscribeEvents()

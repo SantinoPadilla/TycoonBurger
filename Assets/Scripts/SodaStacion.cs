@@ -40,12 +40,9 @@ public class SodaStacion : MonoBehaviour, IInteractable
     public UnityEvent onQTESucceeded;
     public UnityEvent onQTEFailed;
 
-    [Header("Configuración de Mejoras")]
-    [Tooltip("Proporción ampliada de la zona verde de éxito del QTE al activar la mejora (ej. 0.35 = 35% del ancho de la barra). Modificable en el Inspector.")]
-    [SerializeField] private float upgradedGreenCenterRatio = 0.35f;
-
     private bool isQTEActive = false;
     private int currentUpgradeLevel = 0;
+    private float upgradedGreenCenterRatio = 0.35f;
 
     public bool IsQTEActive => isQTEActive;
     public float UpgradedGreenCenterRatio { get => upgradedGreenCenterRatio; set => upgradedGreenCenterRatio = value; }
@@ -57,9 +54,22 @@ public class SodaStacion : MonoBehaviour, IInteractable
     public int AccumulatedSlotCount => productOutputSlot != null ? productOutputSlot.childCount : 0;
 
     /// <summary>
-    /// Aplica el nivel de mejora a la estación de soda.
-    /// Nivel 1: Desbloqueo estación Soda (manejado en UI).
-    /// Nivel 2: Agranda la zona de éxito del centro verde del QTE.
+    /// Aplica el conjunto de características activas configuradas en SodaUpgradeItemUI.
+    /// </summary>
+    public void SetUpgradeFeatures(System.Collections.Generic.HashSet<SodaUpgradeFeature> activeFeatures, float customGreenRatio = 0.35f)
+    {
+        if (activeFeatures == null) return;
+        upgradedGreenCenterRatio = customGreenRatio;
+        bool isGreenZoneExpanded = activeFeatures.Contains(SodaUpgradeFeature.AmpliarZonaVerdeQTE);
+        if (qteUI != null)
+        {
+            qteUI.UpgradedGreenCenterRatio = upgradedGreenCenterRatio;
+            qteUI.UseUpgradedGreenZone = isGreenZoneExpanded;
+        }
+    }
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la estación de soda (Compatibilidad por defecto).
     /// </summary>
     public void SetUpgradeLevel(int level)
     {

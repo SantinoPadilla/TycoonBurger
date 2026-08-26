@@ -2,15 +2,15 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
+public enum SodaUpgradeFeature
+{
+    DesbloquearEstacionYSoda,
+    AmpliarZonaVerdeQTE
+}
+
 /// <summary>
 /// Componente de UI dedicado exclusivamente para las mejoras de la Estación de Soda/Gaseosa (SodaStacion) en el panel 'MejorasPanel'.
-/// Administra el nivel alcanzado y activa/desactiva automáticamente los elementos vinculados:
-/// Nivel 1:
-/// 1. Estación de Soda en cocina.
-/// 2. Tarjeta del ingrediente de Soda en la tienda de insumos.
-/// 3. Slot de Soda en la barra de inventario del HUD.
-/// 4. Objeto de Soda en el resumen del turno (ShiftResume).
-/// 5. Registra el ProductSO de Soda en los pedidos de CustomerSpawner.
+/// Administra el nivel alcanzado y activa/desactiva las mejoras según el orden configurado en el Inspector.
 /// </summary>
 public class SodaUpgradeItemUI : MonoBehaviour
 {
@@ -18,7 +18,20 @@ public class SodaUpgradeItemUI : MonoBehaviour
     [Tooltip("ScriptableObject de datos de la mejora de la Soda (ej. Upgrade_Soda).")]
     [SerializeField] private UpgradeDataSO upgradeData;
 
-    [Header("Desbloqueos del Nivel 1 (Escena, Tienda, HUD y Resumen)")]
+    [Header("Orden de Mejoras (Configurable en Inspector)")]
+    [Tooltip("Orden en el que se desbloquean las mejoras de la estación de soda (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
+    [SerializeField] private System.Collections.Generic.List<SodaUpgradeFeature> upgradeOrder = new System.Collections.Generic.List<SodaUpgradeFeature>()
+    {
+        SodaUpgradeFeature.DesbloquearEstacionYSoda,
+        SodaUpgradeFeature.AmpliarZonaVerdeQTE
+    };
+
+    [Header("Parámetros de Mejora")]
+    [Tooltip("Proporción ampliada de la zona verde de éxito del QTE al activar la mejora (ej. 0.35 = 35% del ancho de la barra).")]
+    [Range(0.05f, 0.8f)]
+    [SerializeField] private float upgradedGreenCenterRatio = 0.35f;
+
+    [Header("Desbloqueos de la Estación e Ingredientes")]
     [Tooltip("1. Objeto o estación física de la SodaStacion en la cocina.")]
     [SerializeField] private GameObject sodaStationObject;
 
@@ -56,6 +69,7 @@ public class SodaUpgradeItemUI : MonoBehaviour
     [SerializeField] private Text uiButtonText;
 
     public UpgradeDataSO UpgradeData => upgradeData;
+    public System.Collections.Generic.List<SodaUpgradeFeature> UpgradeOrder => upgradeOrder;
 
     private void Awake()
     {
@@ -108,7 +122,7 @@ public class SodaUpgradeItemUI : MonoBehaviour
         int currentLevel = (mgr != null) ? mgr.GetUpgradeLevel(upgradeData.UpgradeId) : 0;
         bool isMax = (mgr != null) ? mgr.IsMaxLevel(upgradeData) : (currentLevel >= upgradeData.MaxLevel);
 
-        // Aplicar activación/desactivación de los elementos según el nivel
+        // Aplicar activación/desactivación de los elementos según el orden en Inspector
         ApplyUnlocks(currentLevel);
 
         if (isMax)
@@ -138,38 +152,42 @@ public class SodaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Activa o desactiva los elementos del juego y la UI según el nivel alcanzado en la Estación de Soda.
+    /// Activa o desactiva los elementos del juego y la UI según las mejoras desbloqueadas en 'upgradeOrder'.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
-        // Nivel >= 1 desbloquea la estación de Soda y sus componentes vinculados
-        bool isUnlocked = (currentLevel >= 1);
+        System.Collections.Generic.HashSet<SodaUpgradeFeature> activeFeatures = new System.Collections.Generic.HashSet<SodaUpgradeFeature>();
+        if (upgradeOrder != null)
+        {
+            int unlockedCount = Mathf.Clamp(currentLevel, 0, upgradeOrder.Count);
+            for (int i = 0; i < unlockedCount; i++)
+            {
+                activeFeatures.Add(upgradeOrder[i]);
+            }
+        }
 
-        // 1. Estación de Soda en la cocina
+        bool isUnlocked = activeFeatures.Contains(SodaUpgradeFeature.DesbloquearEstacionYSoda);
+
         if (sodaStationObject != null && sodaStationObject.activeSelf != isUnlocked)
         {
             sodaStationObject.SetActive(isUnlocked);
         }
 
-        // 2. Tarjeta del ingrediente Soda en la tienda de insumos
         if (sodaShopItem != null && sodaShopItem.gameObject.activeSelf != isUnlocked)
         {
             sodaShopItem.gameObject.SetActive(isUnlocked);
         }
 
-        // 3. Slot del ingrediente Soda en la barra de inventario del HUD
         if (sodaInventorySlot != null && sodaInventorySlot.gameObject.activeSelf != isUnlocked)
         {
             sodaInventorySlot.gameObject.SetActive(isUnlocked);
         }
 
-        // 4. Objeto de Soda vendida en la pantalla de resumen del servicio (ShiftResume)
         if (shiftResumeSodaObject != null && shiftResumeSodaObject.activeSelf != isUnlocked)
         {
             shiftResumeSodaObject.SetActive(isUnlocked);
         }
 
-        // 5. Agregar o remover el ProductSO de Soda de los pedidos de clientes en CustomerSpawner
         CustomerSpawner spawner = FindFirstObjectByType<CustomerSpawner>(FindObjectsInactive.Include);
         if (spawner != null && sodaProductSO != null)
         {
@@ -183,11 +201,10 @@ public class SodaUpgradeItemUI : MonoBehaviour
             }
         }
 
-        // Habilitar la lógica de mejoras en el script SodaStacion (Nivel 1: Estación, Nivel 2: Zona verde QTE ampliada)
         SodaStacion station = (sodaStationObject != null) ? sodaStationObject.GetComponent<SodaStacion>() : FindFirstObjectByType<SodaStacion>(FindObjectsInactive.Include);
         if (station != null)
         {
-            station.SetUpgradeLevel(currentLevel);
+            station.SetUpgradeFeatures(activeFeatures, upgradedGreenCenterRatio);
         }
     }
 

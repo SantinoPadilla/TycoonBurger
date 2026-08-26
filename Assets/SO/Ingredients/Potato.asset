@@ -16,9 +16,9 @@ MonoBehaviour:
   icon: {fileID: 21300000, guid: 621e4d76cb391a940a1cea292f51f516, type: 3}
   prefab: {fileID: 6484700413604631191, guid: 63ff820280a507146b00d6974e605c3e, type: 3}
   isCookable: 1
-  timeToCook: 5
-  timeToBurn: 5
+  timeToCook: 7
+  timeToBurn: 4
   rawColor: {r: 1, g: 1, b: 1, a: 1}
   cookedColor: {r: 1, g: 0.8087147, b: 0.15566039, a: 1}
   burntColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
-  buyPrice: 6
+  buyPrice: 10

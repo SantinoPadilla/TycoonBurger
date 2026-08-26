@@ -256,6 +256,45 @@ public class RestaurantShiftManager : MonoBehaviour
             }
         }
 
+        // 7. Slots de entrada independientes
+        StationInputSlot[] inputSlots = FindObjectsByType<StationInputSlot>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var slot in inputSlots)
+        {
+            if (slot != null) slot.ResetSlot();
+        }
+
+        // 8. Slots de salida independientes
+        StationOutputSlot[] outputSlots = FindObjectsByType<StationOutputSlot>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var slot in outputSlots)
+        {
+            if (slot != null)
+            {
+                for (int i = slot.transform.childCount - 1; i >= 0; i--)
+                {
+                    Destroy(slot.transform.GetChild(i).gameObject);
+                }
+            }
+        }
+
+        // 9. Limpieza exhaustiva de cualquier objeto restante con componentes de producto o ingrediente
+        Ingredient[] ingredients = FindObjectsByType<Ingredient>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var ing in ingredients)
+        {
+            if (ing != null && ing.gameObject != null) Destroy(ing.gameObject);
+        }
+
+        SellableProduct[] sellables = FindObjectsByType<SellableProduct>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var sp in sellables)
+        {
+            if (sp != null && sp.gameObject != null) Destroy(sp.gameObject);
+        }
+
+        HamburguesaCompleta[] burgers = FindObjectsByType<HamburguesaCompleta>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var b in burgers)
+        {
+            if (b != null && b.gameObject != null) Destroy(b.gameObject);
+        }
+
         Debug.Log("[RestaurantShiftManager] ¡Limpieza completa de la cocina realizada al cerrar!");
     }
 

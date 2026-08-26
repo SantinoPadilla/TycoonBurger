@@ -18,15 +18,9 @@ public class ProfitUpgradeItemUI : MonoBehaviour
     [Tooltip("ScriptableObject de datos de la mejora de ganancias (ej. Upgrade_Profit).")]
     [SerializeField] private UpgradeDataSO upgradeData;
 
-    [Header("Porcentajes de Incremento de Ganancia por Nivel (%)")]
-    [Tooltip("Porcentaje adicional de dinero obtenido en las ventas para el Nivel 1 (ej. 10 para +10%).")]
-    [SerializeField] private float level1ProfitPercentage = 10f;
-
-    [Tooltip("Porcentaje adicional de dinero obtenido en las ventas para el Nivel 2 (ej. 25 para +25%).")]
-    [SerializeField] private float level2ProfitPercentage = 25f;
-
-    [Tooltip("Porcentaje adicional de dinero obtenido en las ventas para el Nivel 3 (ej. 50 para +50%).")]
-    [SerializeField] private float level3ProfitPercentage = 50f;
+    [Header("Orden de Porcentajes de Incremento de Ganancia (%)")]
+    [Tooltip("Lista de porcentajes de ganancia adicional asignados según el nivel alcanzado (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
+    [SerializeField] private System.Collections.Generic.List<float> profitPercentageSteps = new System.Collections.Generic.List<float>() { 10f, 25f, 50f };
 
     [Header("Referencias Visuales UI")]
     [SerializeField] private Image iconImage;
@@ -60,6 +54,7 @@ public class ProfitUpgradeItemUI : MonoBehaviour
     public static float CurrentProfitPercentage { get; private set; } = 0f;
 
     public UpgradeDataSO UpgradeData => upgradeData;
+    public System.Collections.Generic.List<float> ProfitPercentageSteps => profitPercentageSteps;
 
     private void Awake()
     {
@@ -143,23 +138,15 @@ public class ProfitUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Aplica el porcentaje de ganancia según el nivel alcanzado y actualiza el multiplicador global.
+    /// Aplica el porcentaje de ganancia según la lista 'profitPercentageSteps' y actualiza el multiplicador global.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
         float percentage = 0f;
-        switch (currentLevel)
+        if (currentLevel > 0 && profitPercentageSteps != null && profitPercentageSteps.Count > 0)
         {
-            case 1:
-                percentage = level1ProfitPercentage;
-                break;
-            case 2:
-                percentage = level2ProfitPercentage;
-                break;
-            case 3:
-            default:
-                if (currentLevel >= 3) percentage = level3ProfitPercentage;
-                break;
+            int index = Mathf.Clamp(currentLevel - 1, 0, profitPercentageSteps.Count - 1);
+            percentage = profitPercentageSteps[index];
         }
 
         CurrentProfitPercentage = percentage;

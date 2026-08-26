@@ -1,44 +1,41 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-public enum PlanchaUpgradeFeature
+[System.Serializable]
+public struct CustomerUpgradeStep
 {
-    SegundoSlot,
-    VelocidadCoccion,
-    RetiradoAutomatico
+    [Tooltip("Máximo número de clientes simultáneos permitidos en pantalla para este nivel.")]
+    public int maxConcurrentCustomers;
+
+    [Tooltip("Intervalo entre apariciones de clientes (en segundos) para este nivel.")]
+    public float spawnInterval;
 }
 
 /// <summary>
-/// Componente de UI dedicado exclusivamente para las mejoras de la Plancha de Cocina (CookingGrill) en el panel 'MejorasPanel'.
-/// Administra el nivel alcanzado y activa/desactiva las mejoras según el orden configurado en el Inspector.
+/// Componente de UI dedicado exclusivamente para la mejora de Llegada de Clientes (CustomerUpgrade) en el panel 'MejorasPanel'.
+/// Administra los niveles de la mejora y aplica los valores de 'maxConcurrentCustomers' y 'spawnInterval' al CustomerSpawner:
+/// Nivel 1, Nivel 2, Nivel 3... según la lista de pasos configurada en 'levelSteps'.
 /// </summary>
-public class PlanchaUpgradeItemUI : MonoBehaviour
+public class CustomerUpgradeItemUI : MonoBehaviour
 {
     [Header("Configuración de la Mejora (ScriptableObject)")]
-    [Tooltip("ScriptableObject de datos de la mejora de la Plancha (ej. Upgrade_Plancha).")]
+    [Tooltip("ScriptableObject de datos de la mejora de clientes (ej. Upgrade_CustomerSpawner).")]
     [SerializeField] private UpgradeDataSO upgradeData;
 
-    [Header("Orden de Mejoras (Configurable en Inspector)")]
-    [Tooltip("Orden en el que se desbloquean las mejoras de la plancha (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
-    [SerializeField] private System.Collections.Generic.List<PlanchaUpgradeFeature> upgradeOrder = new System.Collections.Generic.List<PlanchaUpgradeFeature>()
+    [Header("Referencia al CustomerSpawner")]
+    [Tooltip("Componente CustomerSpawner al cual aplicar los nuevos límites y tiempos. Si está vacío, se buscará en la escena.")]
+    [SerializeField] private CustomerSpawner customerSpawner;
+
+    [Header("Configuración de Parámetros por Nivel de Mejora")]
+    [Tooltip("Configuración de maxConcurrentCustomers y spawnInterval por nivel (Índice 0 = Nivel 1, Índice 1 = Nivel 2, etc.).")]
+    [SerializeField] private List<CustomerUpgradeStep> levelSteps = new List<CustomerUpgradeStep>()
     {
-        PlanchaUpgradeFeature.SegundoSlot,
-        PlanchaUpgradeFeature.VelocidadCoccion,
-        PlanchaUpgradeFeature.RetiradoAutomatico
+        new CustomerUpgradeStep { maxConcurrentCustomers = 4, spawnInterval = 4.5f },
+        new CustomerUpgradeStep { maxConcurrentCustomers = 5, spawnInterval = 4.0f },
+        new CustomerUpgradeStep { maxConcurrentCustomers = 6, spawnInterval = 3.5f }
     };
-
-    [Header("Parámetros de Mejora")]
-    [Tooltip("Multiplicador de velocidad de cocción al desbloquear la mejora de velocidad (ej. 1.5 = 50% más rápido).")]
-    [SerializeField] private float cookSpeedMultiplier = 1.5f;
-
-    [Header("Estación Plancha en Cocina")]
-    [Tooltip("Estación o componente CookingGrill al que se le aplicará el desbloqueo del slot 2.")]
-    [SerializeField] private CookingGrill planchaStation;
-
-    [Header("Desbloqueos del Nivel 1 (Slot 2)")]
-    [Tooltip("GameObject en la escena que representa la extensión física o slot 2 secundario de la Plancha.")]
-    [SerializeField] private GameObject planchaSlot2ExtensionObject;
 
     [Header("Referencias Visuales UI")]
     [SerializeField] private Image iconImage;
@@ -62,11 +59,19 @@ public class PlanchaUpgradeItemUI : MonoBehaviour
     [SerializeField] private Text uiButtonText;
 
     public UpgradeDataSO UpgradeData => upgradeData;
-    public System.Collections.Generic.List<PlanchaUpgradeFeature> UpgradeOrder => upgradeOrder;
+    public List<CustomerUpgradeStep> LevelSteps => levelSteps;
 
     private void Awake()
     {
         InitializeInScene();
+    }
+
+    private void Start()
+    {
+        int currentMoney = 0;
+        IMoneyService moneyService = FindFirstObjectByType<MoneyManager>();
+        if (moneyService != null) currentMoney = moneyService.CurrentMoney;
+        UpdateDisplay(currentMoney);
     }
 
     private void OnValidate()
@@ -105,7 +110,7 @@ public class PlanchaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Actualiza el estado visual de la tarjeta de la plancha y aplica los desbloqueos correspondientes.
+    /// Actualiza el estado visual de la tarjeta de mejora y aplica los límites al CustomerSpawner.
     /// </summary>
     public void UpdateDisplay(int currentMoney)
     {
@@ -115,14 +120,14 @@ public class PlanchaUpgradeItemUI : MonoBehaviour
         int currentLevel = (mgr != null) ? mgr.GetUpgradeLevel(upgradeData.UpgradeId) : 0;
         bool isMax = (mgr != null) ? mgr.IsMaxLevel(upgradeData) : (currentLevel >= upgradeData.MaxLevel);
 
-        // Aplicar activación/desactivación de los elementos según el orden en Inspector
+        // Aplicar valores correspondientes al CustomerSpawner
         ApplyUnlocks(currentLevel);
 
         if (isMax)
         {
             SetText(tmpLevelText, uiLevelText, $"Nivel: {currentLevel} (MÁXIMO)");
             SetText(tmpPriceText, uiPriceText, "COMPRADO");
-            SetText(tmpDescText, uiDescText, "Mejora completada al máximo.");
+            SetText(tmpDescText, uiDescText, "Llegada de clientes mejorada al máximo.");
             SetText(tmpButtonText, uiButtonText, "Máximo");
 
             if (buyButton != null) buyButton.interactable = false;
@@ -145,31 +150,22 @@ public class PlanchaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Activa o desactiva los elementos del juego y la UI según las mejoras desbloqueadas en 'upgradeOrder'.
+    /// Aplica los límites de clientes simultáneos e intervalo de spawn a CustomerSpawner según el nivel actual.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
-        System.Collections.Generic.HashSet<PlanchaUpgradeFeature> activeFeatures = new System.Collections.Generic.HashSet<PlanchaUpgradeFeature>();
-        if (upgradeOrder != null)
+        CustomerSpawner spawner = (customerSpawner != null) ? customerSpawner : FindFirstObjectByType<CustomerSpawner>(FindObjectsInactive.Include);
+        if (spawner == null) return;
+
+        if (currentLevel > 0 && levelSteps != null && levelSteps.Count > 0)
         {
-            int unlockedCount = Mathf.Clamp(currentLevel, 0, upgradeOrder.Count);
-            for (int i = 0; i < unlockedCount; i++)
-            {
-                activeFeatures.Add(upgradeOrder[i]);
-            }
+            int index = Mathf.Clamp(currentLevel - 1, 0, levelSteps.Count - 1);
+            CustomerUpgradeStep step = levelSteps[index];
+            spawner.SetUpgradeCustomerLimits(step.maxConcurrentCustomers, step.spawnInterval);
         }
-
-        bool slot2Unlocked = activeFeatures.Contains(PlanchaUpgradeFeature.SegundoSlot);
-
-        if (planchaSlot2ExtensionObject != null && planchaSlot2ExtensionObject.activeSelf != slot2Unlocked)
+        else
         {
-            planchaSlot2ExtensionObject.SetActive(slot2Unlocked);
-        }
-
-        CookingGrill grillComp = (planchaStation != null) ? planchaStation : FindFirstObjectByType<CookingGrill>(FindObjectsInactive.Include);
-        if (grillComp != null)
-        {
-            grillComp.SetUpgradeFeatures(activeFeatures, cookSpeedMultiplier);
+            spawner.ClearUpgradeCustomerLimits();
         }
     }
 
@@ -180,7 +176,7 @@ public class PlanchaUpgradeItemUI : MonoBehaviour
         UpgradeManager mgr = UpgradeManager.Instance ?? FindFirstObjectByType<UpgradeManager>();
         if (mgr == null)
         {
-            Debug.LogWarning("[PlanchaUpgradeItemUI] No se encontró UpgradeManager en la escena.");
+            Debug.LogWarning("[CustomerUpgradeItemUI] No se encontró UpgradeManager en la escena.");
             return;
         }
 

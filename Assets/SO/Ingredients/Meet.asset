@@ -17,7 +17,7 @@ MonoBehaviour:
   prefab: {fileID: 7176187690021364536, guid: ab8c4e72571ddd944b832a220c92e4e8, type: 3}
   isCookable: 1
   timeToCook: 7
-  timeToBurn: 5
+  timeToBurn: 4
   rawColor: {r: 1, g: 1, b: 1, a: 1}
   cookedColor: {r: 0.6, g: 0.3, b: 0.1, a: 1}
   burntColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}

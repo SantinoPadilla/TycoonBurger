@@ -10,18 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 39b5867cdcdcdfd46a38ab2fd1c79e05, type: 3}
-  m_Name: PlayerCapacity
+  m_Name: PlayerSpeed
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDataSO
-  upgradeId: PlayerCapacity
-  upgradeName: PlayerCapacity
+  upgradeId: PlayerSpeed
+  upgradeName: PlayerSpeed
   icon: {fileID: 0}
   levels:
   - levelNumber: 1
-    price: 10
-    description: 
+    price: 75
+    description: ' + velocidad de movimiento'
   - levelNumber: 2
-    price: 20
-    description: 
+    price: 125
+    description: ' + velocidad de movimiento'
   - levelNumber: 3
-    price: 30
-    description: 
+    price: 350
+    description: ' + velocidad de movimiento'

@@ -220,8 +220,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Customer
   moveSpeed: 3
   stopDistanceThreshold: 0.05
-  maxPatienceTime: 100
-  maxTakeOrderTime: 30
+  maxPatienceTime: 40
+  maxTakeOrderTime: 25
   customerUI: {fileID: 8045158623338776376}
   onOrderCompleted:
     m_PersistentCalls:
