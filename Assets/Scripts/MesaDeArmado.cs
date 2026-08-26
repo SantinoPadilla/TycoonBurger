@@ -24,6 +24,13 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     [SerializeField] private float assemblyTime = 3f;
     [SerializeField] private float maxInteractionDistance = 2f;
 
+    [Header("Configuración de Mejoras")]
+    [Tooltip("Tiempo de armado reducido en segundos al desbloquear el Nivel 1 de mejora (modificable en el Inspector).")]
+    [SerializeField] private float upgradedAssemblyTime = 1.5f;
+
+    [Tooltip("Si es verdadero (Nivel 2 de mejora), el ensamblado se realiza automáticamente al recibir el ingrediente carne cocida.")]
+    [SerializeField] private bool autoAssembleOnPattyReceived = false;
+
     [Header("Slot de Destino (Cocinado/Ensamblado)")]
     [Tooltip("Slot/Transform asignado en el Inspector a donde se moverán los productos ensamblados para acumularse. Si no está asignado, irán a la mesa/manos del jugador.")]
     [SerializeField] private Transform completedProductSlot;
@@ -41,9 +48,15 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
 
     private float currentAssemblyTimer = 0f;
     private int lastSlotCount = -1;
+    private int currentUpgradeLevel = 0;
 
     public bool HasIngredientsOnTable => placedPatty != null && hasBun;
     public bool IsCompleted => completedBurgerObj != null;
+
+    public float UpgradedAssemblyTime { get => upgradedAssemblyTime; set => upgradedAssemblyTime = value; }
+    public bool AutoAssembleOnPattyReceived { get => autoAssembleOnPattyReceived; set => autoAssembleOnPattyReceived = value; }
+    public int CurrentUpgradeLevel => currentUpgradeLevel;
+    public float EffectiveAssemblyTime => (currentUpgradeLevel >= 1 || upgradedAssemblyTime < assemblyTime && currentUpgradeLevel > 0) ? upgradedAssemblyTime : (currentUpgradeLevel >= 1 ? upgradedAssemblyTime : assemblyTime);
 
     /// <summary>
     /// Cantidad de productos acumulados actualmente en el slot de destino.
@@ -52,6 +65,20 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
 
     public GameObject ResultPrefab => (recipeSO != null && recipeSO.ResultPrefab != null) ? recipeSO.ResultPrefab : completeBurgerPrefab;
     public IngredientSO RequiredBun => recipeSO != null ? recipeSO.RequiredBunIngredient : null;
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la mesa de armado.
+    /// Nivel 1: Tiempo de armado reducido.
+    /// Nivel 2: Tiempo de armado reducido y armado automático al recibir el ingrediente carne cocida.
+    /// </summary>
+    public void SetUpgradeLevel(int level)
+    {
+        currentUpgradeLevel = Mathf.Max(0, level);
+        if (currentUpgradeLevel >= 2)
+        {
+            autoAssembleOnPattyReceived = true;
+        }
+    }
 
     private void Awake()
     {
@@ -69,34 +96,55 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     {
         if (HasIngredientsOnTable && !IsCompleted)
         {
-            ICarrier carrier = FindFirstObjectByType<PlayerCarrySystem>();
+            float targetAssemblyTime = (currentUpgradeLevel >= 1) ? upgradedAssemblyTime : assemblyTime;
 
-            bool isPlayerNearby = carrier != null &&
-                Vector3.Distance(transform.position, carrier.transform.position) <= maxInteractionDistance;
-
-            bool isHoldingInteract = IsInteractKeyHeld();
-
-            if (isPlayerNearby && isHoldingInteract)
+            // Nivel 2: Armado automático al recibir la carne cocida
+            if (autoAssembleOnPattyReceived || currentUpgradeLevel >= 2)
             {
                 currentAssemblyTimer += Time.deltaTime;
 
                 if (progressBarUI != null)
                 {
-                    progressBarUI.UpdateProgress(currentAssemblyTimer / assemblyTime, 0.5f);
+                    progressBarUI.UpdateProgress(currentAssemblyTimer / targetAssemblyTime, 0.5f);
                 }
 
-                if (currentAssemblyTimer >= assemblyTime)
+                if (currentAssemblyTimer >= targetAssemblyTime)
                 {
                     CompleteAssembly();
                 }
             }
             else
             {
-                if (currentAssemblyTimer > 0f)
+                // Nivel 0 o Nivel 1: Requiere que el jugador esté cerca y mantenga el botón presionado
+                ICarrier carrier = FindFirstObjectByType<PlayerCarrySystem>();
+
+                bool isPlayerNearby = carrier != null &&
+                    Vector3.Distance(transform.position, carrier.transform.position) <= maxInteractionDistance;
+
+                bool isHoldingInteract = IsInteractKeyHeld();
+
+                if (isPlayerNearby && isHoldingInteract)
                 {
-                    currentAssemblyTimer = 0f;
-                    if (progressBarUI != null) progressBarUI.Hide();
-                    Debug.Log("[MesaDeArmado] Se soltó el Click Izquierdo. Progreso reseteado. Ingredientes a salvo.");
+                    currentAssemblyTimer += Time.deltaTime;
+
+                    if (progressBarUI != null)
+                    {
+                        progressBarUI.UpdateProgress(currentAssemblyTimer / targetAssemblyTime, 0.5f);
+                    }
+
+                    if (currentAssemblyTimer >= targetAssemblyTime)
+                    {
+                        CompleteAssembly();
+                    }
+                }
+                else
+                {
+                    if (currentAssemblyTimer > 0f)
+                    {
+                        currentAssemblyTimer = 0f;
+                        if (progressBarUI != null) progressBarUI.Hide();
+                        Debug.Log("[MesaDeArmado] Se soltó el Click Izquierdo. Progreso reseteado. Ingredientes a salvo.");
+                    }
                 }
             }
         }
@@ -359,7 +407,12 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     public string GetInteractPrompt()
     {
         if (IsCompleted) return "Recoger Producto Ensamblado";
-        if (HasIngredientsOnTable) return "Mantén [Click Izquierdo] para Ensamblar";
+        if (HasIngredientsOnTable)
+        {
+            if (autoAssembleOnPattyReceived || currentUpgradeLevel >= 2)
+                return "Ensamblando automáticamente...";
+            return "Mantén [Click Izquierdo] para Ensamblar";
+        }
         return "Colocar Carne Cocinada + Pan";
     }
 

@@ -21,4 +21,4 @@ MonoBehaviour:
   rawColor: {r: 1, g: 1, b: 1, a: 1}
   cookedColor: {r: 1, g: 0.8087147, b: 0.15566039, a: 1}
   burntColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
-  buyPrice: 5
+  buyPrice: 6

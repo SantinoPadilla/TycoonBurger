@@ -15,7 +15,7 @@ MonoBehaviour:
   productName: Burger
   icon: {fileID: 21300000, guid: 66694a949ac785b4ca5be95db71bcfd6, type: 3}
   resultPrefab: {fileID: 7982183530490852025, guid: c9255397669191c4e90d9a4735d85cac, type: 3}
-  sellPrice: 5
+  sellPrice: 15
   requiresAssembly: 1
   assemblyTime: 3
   requiredIngredients:

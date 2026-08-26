@@ -438,6 +438,19 @@ public class ShopUI : MonoBehaviour
                 }
             }
         }
+
+        // Actualizar tarjetas de mejora de la mesa de armado en la tienda
+        MesaDeArmadoUpgradeItemUI[] mesaUpgrades = GetComponentsInChildren<MesaDeArmadoUpgradeItemUI>(true);
+        if (mesaUpgrades != null)
+        {
+            foreach (var upgradeUI in mesaUpgrades)
+            {
+                if (upgradeUI != null)
+                {
+                    upgradeUI.UpdateDisplay(currentMoney);
+                }
+            }
+        }
     }
 
     private void SubscribeEvents()

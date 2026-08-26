@@ -15,7 +15,7 @@ MonoBehaviour:
   productName: Soda
   icon: {fileID: 21300000, guid: c39de97aa4aadf14886d8a3cf985bf5d, type: 3}
   resultPrefab: {fileID: 6080739620263338701, guid: 4675b320062d36b4aa83d594374ff9f0, type: 3}
-  sellPrice: 15
+  sellPrice: 20
   requiresAssembly: 0
   assemblyTime: 3
   requiredIngredients:
