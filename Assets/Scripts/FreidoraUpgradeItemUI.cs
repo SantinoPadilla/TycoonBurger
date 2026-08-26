@@ -193,25 +193,11 @@ public class FreidoraUpgradeItemUI : MonoBehaviour
             freidoraSlot2ExtensionObject.SetActive(lvl2Unlocked);
         }
 
-        // Habilitar la lógica del segundo puesto en el script Freidora
+        // Habilitar la lógica de mejoras en el script Freidora (Nivel 1: Estación, Nivel 2: Slot 2, Nivel 3: Tiempo Reducido, Nivel 4: Retirado Automático)
         Freidora freidoraComp = (freidoraStationObject != null) ? freidoraStationObject.GetComponent<Freidora>() : FindFirstObjectByType<Freidora>(FindObjectsInactive.Include);
-        if (freidoraComp != null && freidoraComp.EnableSlot2 != lvl2Unlocked)
+        if (freidoraComp != null)
         {
-            freidoraComp.EnableSlot2 = lvl2Unlocked;
-        }
-
-        // Lógica específica para Niveles 3 al 5 (Reservada para futuras mejoras)
-        switch (currentLevel)
-        {
-            case 3:
-                // TODO: Lógica para Freidora Nivel 3
-                break;
-            case 4:
-                // TODO: Lógica para Freidora Nivel 4
-                break;
-            case 5:
-                // TODO: Lógica para Freidora Nivel 5
-                break;
+            freidoraComp.SetUpgradeLevel(currentLevel);
         }
     }
 

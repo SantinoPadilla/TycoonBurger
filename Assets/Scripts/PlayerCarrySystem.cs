@@ -42,6 +42,15 @@ public class PlayerCarrySystem : MonoBehaviour, ICarrier
         }
     }
 
+    /// <summary>
+    /// Actualiza dinámicamente la capacidad máxima de carga del jugador.
+    /// </summary>
+    public void SetMaxCapacity(int capacity)
+    {
+        maxCapacity = Mathf.Max(1, capacity);
+        Debug.Log($"[PlayerCarrySystem] Capacidad máxima actualizada a: {maxCapacity}");
+    }
+
     public bool CanCarryMore()
     {
         return carriedItems.Count < maxCapacity;

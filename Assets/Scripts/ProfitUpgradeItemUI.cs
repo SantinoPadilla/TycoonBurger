@@ -3,36 +3,30 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Componente de UI dedicado exclusivamente para las mejoras de la Estación de Soda/Gaseosa (SodaStacion) en el panel 'MejorasPanel'.
-/// Administra el nivel alcanzado y activa/desactiva automáticamente los elementos vinculados:
-/// Nivel 1:
-/// 1. Estación de Soda en cocina.
-/// 2. Tarjeta del ingrediente de Soda en la tienda de insumos.
-/// 3. Slot de Soda en la barra de inventario del HUD.
-/// 4. Objeto de Soda en el resumen del turno (ShiftResume).
-/// 5. Registra el ProductSO de Soda en los pedidos de CustomerSpawner.
+/// Componente de UI dedicado exclusivamente para la mejora de Ganancias / Profit en el panel 'MejorasPanel'.
+/// Administra el nivel alcanzado y multiplica el valor de venta de los productos mediante un porcentaje configurable:
+/// Nivel 1: Porcentaje asignado en Inspector (level1ProfitPercentage, ej. +10%).
+/// Nivel 2: Porcentaje asignado en Inspector (level2ProfitPercentage, ej. +25%).
+/// Nivel 3: Porcentaje asignado en Inspector (level3ProfitPercentage, ej. +50%).
 /// </summary>
-public class SodaUpgradeItemUI : MonoBehaviour
+public class ProfitUpgradeItemUI : MonoBehaviour
 {
+    private static ProfitUpgradeItemUI instance;
+    public static ProfitUpgradeItemUI Instance => instance;
+
     [Header("Configuración de la Mejora (ScriptableObject)")]
-    [Tooltip("ScriptableObject de datos de la mejora de la Soda (ej. Upgrade_Soda).")]
+    [Tooltip("ScriptableObject de datos de la mejora de ganancias (ej. Upgrade_Profit).")]
     [SerializeField] private UpgradeDataSO upgradeData;
 
-    [Header("Desbloqueos del Nivel 1 (Escena, Tienda, HUD y Resumen)")]
-    [Tooltip("1. Objeto o estación física de la SodaStacion en la cocina.")]
-    [SerializeField] private GameObject sodaStationObject;
+    [Header("Porcentajes de Incremento de Ganancia por Nivel (%)")]
+    [Tooltip("Porcentaje adicional de dinero obtenido en las ventas para el Nivel 1 (ej. 10 para +10%).")]
+    [SerializeField] private float level1ProfitPercentage = 10f;
 
-    [Tooltip("2. Tarjeta del ingrediente Soda en el panel de insumos de la tienda (ShopItemUI).")]
-    [SerializeField] private ShopItemUI sodaShopItem;
+    [Tooltip("Porcentaje adicional de dinero obtenido en las ventas para el Nivel 2 (ej. 25 para +25%).")]
+    [SerializeField] private float level2ProfitPercentage = 25f;
 
-    [Tooltip("3. Slot del ingrediente Soda en la barra de inventario del HUD (KitchenInventorySlotUI).")]
-    [SerializeField] private KitchenInventorySlotUI sodaInventorySlot;
-
-    [Tooltip("4. Objeto o casilla de Soda vendida en el panel de resumen de servicio (ShiftSummaryUI).")]
-    [SerializeField] private GameObject shiftResumeSodaObject;
-
-    [Tooltip("5. ProductSO de Soda a incorporar al menú de pedidos de los clientes en CustomerSpawner al desbloquear.")]
-    [SerializeField] private ProductSO sodaProductSO;
+    [Tooltip("Porcentaje adicional de dinero obtenido en las ventas para el Nivel 3 (ej. 50 para +50%).")]
+    [SerializeField] private float level3ProfitPercentage = 50f;
 
     [Header("Referencias Visuales UI")]
     [SerializeField] private Image iconImage;
@@ -55,10 +49,21 @@ public class SodaUpgradeItemUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI tmpButtonText;
     [SerializeField] private Text uiButtonText;
 
+    /// <summary>
+    /// Multiplicador activo global de ganancias (1.0f = sin bonus, 1.1f = +10%, 1.5f = +50%, etc.).
+    /// </summary>
+    public static float CurrentProfitMultiplier { get; private set; } = 1.0f;
+
+    /// <summary>
+    /// Porcentaje de bonus activo (+0%, +10%, +25%, +50%, etc.).
+    /// </summary>
+    public static float CurrentProfitPercentage { get; private set; } = 0f;
+
     public UpgradeDataSO UpgradeData => upgradeData;
 
     private void Awake()
     {
+        if (instance == null) instance = this;
         InitializeInScene();
     }
 
@@ -98,7 +103,7 @@ public class SodaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Actualiza el estado visual de la tarjeta de Soda y aplica los desbloqueos correspondientes.
+    /// Actualiza el estado visual de la tarjeta de profit y aplica el multiplicador correspondiente.
     /// </summary>
     public void UpdateDisplay(int currentMoney)
     {
@@ -108,14 +113,14 @@ public class SodaUpgradeItemUI : MonoBehaviour
         int currentLevel = (mgr != null) ? mgr.GetUpgradeLevel(upgradeData.UpgradeId) : 0;
         bool isMax = (mgr != null) ? mgr.IsMaxLevel(upgradeData) : (currentLevel >= upgradeData.MaxLevel);
 
-        // Aplicar activación/desactivación de los elementos según el nivel
+        // Aplicar multiplicador global de ganancias
         ApplyUnlocks(currentLevel);
 
         if (isMax)
         {
             SetText(tmpLevelText, uiLevelText, $"Nivel: {currentLevel} (MÁXIMO)");
             SetText(tmpPriceText, uiPriceText, "COMPRADO");
-            SetText(tmpDescText, uiDescText, "Mejora completada al máximo.");
+            SetText(tmpDescText, uiDescText, "Ganancias multiplicadas al máximo.");
             SetText(tmpButtonText, uiButtonText, "Máximo");
 
             if (buyButton != null) buyButton.interactable = false;
@@ -125,10 +130,10 @@ public class SodaUpgradeItemUI : MonoBehaviour
             int nextLevel = currentLevel + 1;
             UpgradeLevelConfig nextConfig = upgradeData.GetLevelConfig(nextLevel);
 
-            SetText(tmpLevelText, uiLevelText, currentLevel > 0 ? $"Nivel actual: {currentLevel}" : "Bloqueada");
+            SetText(tmpLevelText, uiLevelText, currentLevel > 0 ? $"Nivel actual: {currentLevel}" : "Sin mejoras");
             SetText(tmpPriceText, uiPriceText, $"${nextConfig.price}");
             SetText(tmpDescText, uiDescText, nextConfig.description);
-            SetText(tmpButtonText, uiButtonText, currentLevel == 0 ? "Desbloquear" : "Mejorar");
+            SetText(tmpButtonText, uiButtonText, currentLevel == 0 ? "Comprar Lvl 1" : "Mejorar");
 
             if (buyButton != null)
             {
@@ -138,57 +143,37 @@ public class SodaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Activa o desactiva los elementos del juego y la UI según el nivel alcanzado en la Estación de Soda.
+    /// Aplica el porcentaje de ganancia según el nivel alcanzado y actualiza el multiplicador global.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
-        // Nivel >= 1 desbloquea la estación de Soda y sus componentes vinculados
-        bool isUnlocked = (currentLevel >= 1);
-
-        // 1. Estación de Soda en la cocina
-        if (sodaStationObject != null && sodaStationObject.activeSelf != isUnlocked)
+        float percentage = 0f;
+        switch (currentLevel)
         {
-            sodaStationObject.SetActive(isUnlocked);
+            case 1:
+                percentage = level1ProfitPercentage;
+                break;
+            case 2:
+                percentage = level2ProfitPercentage;
+                break;
+            case 3:
+            default:
+                if (currentLevel >= 3) percentage = level3ProfitPercentage;
+                break;
         }
 
-        // 2. Tarjeta del ingrediente Soda en la tienda de insumos
-        if (sodaShopItem != null && sodaShopItem.gameObject.activeSelf != isUnlocked)
-        {
-            sodaShopItem.gameObject.SetActive(isUnlocked);
-        }
+        CurrentProfitPercentage = percentage;
+        CurrentProfitMultiplier = 1.0f + (percentage / 100.0f);
+    }
 
-        // 3. Slot del ingrediente Soda en la barra de inventario del HUD
-        if (sodaInventorySlot != null && sodaInventorySlot.gameObject.activeSelf != isUnlocked)
-        {
-            sodaInventorySlot.gameObject.SetActive(isUnlocked);
-        }
-
-        // 4. Objeto de Soda vendida en la pantalla de resumen del servicio (ShiftResume)
-        if (shiftResumeSodaObject != null && shiftResumeSodaObject.activeSelf != isUnlocked)
-        {
-            shiftResumeSodaObject.SetActive(isUnlocked);
-        }
-
-        // 5. Agregar o remover el ProductSO de Soda de los pedidos de clientes en CustomerSpawner
-        CustomerSpawner spawner = FindFirstObjectByType<CustomerSpawner>(FindObjectsInactive.Include);
-        if (spawner != null && sodaProductSO != null)
-        {
-            if (isUnlocked)
-            {
-                spawner.AddAvailableProduct(sodaProductSO);
-            }
-            else
-            {
-                spawner.RemoveAvailableProduct(sodaProductSO);
-            }
-        }
-
-        // Habilitar la lógica de mejoras en el script SodaStacion (Nivel 1: Estación, Nivel 2: Zona verde QTE ampliada)
-        SodaStacion station = (sodaStationObject != null) ? sodaStationObject.GetComponent<SodaStacion>() : FindFirstObjectByType<SodaStacion>(FindObjectsInactive.Include);
-        if (station != null)
-        {
-            station.SetUpgradeLevel(currentLevel);
-        }
+    /// <summary>
+    /// Calcula el precio final redondeado aplicando el multiplicador de ganancia activo.
+    /// </summary>
+    public static int ApplyProfitMultiplier(int basePrice)
+    {
+        if (basePrice <= 0) return basePrice;
+        float multiplier = CurrentProfitMultiplier > 0f ? CurrentProfitMultiplier : 1.0f;
+        return Mathf.RoundToInt(basePrice * multiplier);
     }
 
     private void OnBuyButtonClicked()
@@ -198,7 +183,7 @@ public class SodaUpgradeItemUI : MonoBehaviour
         UpgradeManager mgr = UpgradeManager.Instance ?? FindFirstObjectByType<UpgradeManager>();
         if (mgr == null)
         {
-            Debug.LogWarning("[SodaUpgradeItemUI] No se encontró UpgradeManager en la escena.");
+            Debug.LogWarning("[ProfitUpgradeItemUI] No se encontró UpgradeManager en la escena.");
             return;
         }
 

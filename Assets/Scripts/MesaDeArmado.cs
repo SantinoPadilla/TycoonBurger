@@ -31,27 +31,33 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     [Tooltip("Si es verdadero (Nivel 2 de mejora), el ensamblado se realiza automáticamente al recibir el ingrediente carne cocida.")]
     [SerializeField] private bool autoAssembleOnPattyReceived = false;
 
+    [Header("Slot de Entrada (Carne Cocinada Acumulable)")]
+    [Tooltip("Slot/Transform asignado en el Inspector a donde se colocarán y acumularán las carnes cocinadas apiladas antes de armar.")]
+    [SerializeField] private Transform cookedPattyInputSlot;
+    [Tooltip("Desplazamiento vertical entre carnes apiladas en el slot de entrada (ej. (0, 0.4, 0)).")]
+    [SerializeField] private Vector3 pattyStackOffset = new Vector3(0f, 0.4f, 0f);
+    [Tooltip("Capacidad máxima de carnes cocinadas acumulables en el slot de entrada.")]
+    [SerializeField] private int maxPattyCapacity = 5;
+
     [Header("Slot de Destino (Cocinado/Ensamblado)")]
     [Tooltip("Slot/Transform asignado en el Inspector a donde se moverán los productos ensamblados para acumularse. Si no está asignado, irán a la mesa/manos del jugador.")]
     [SerializeField] private Transform completedProductSlot;
-
-    [Header("UI Contador de Productos Acumulados")]
-    [Tooltip("Componente TextMeshProUGUI (opcional) para mostrar cuántos productos hay acumulados en el slot.")]
-    [SerializeField] private TextMeshProUGUI tmpSlotCountText;
-    [Tooltip("Componente Text de Unity UI tradicional (opcional) para mostrar cuántos productos hay acumulados en el slot.")]
-    [SerializeField] private Text uiSlotCountText;
-    [SerializeField] private string slotCountPrefix = "Hamburguesas: ";
+    [Tooltip("Desplazamiento vertical entre productos apilados en el slot de salida.")]
+    [SerializeField] private Vector3 outputSlotStackOffset = new Vector3(0f, 0.4f, 0f);
 
     private ICookable placedPatty;
     private bool hasBun = false;
     private GameObject completedBurgerObj;
 
     private float currentAssemblyTimer = 0f;
-    private int lastSlotCount = -1;
     private int currentUpgradeLevel = 0;
+    private StationInputSlot inputSlotComponent;
 
     public bool HasIngredientsOnTable => placedPatty != null && hasBun;
     public bool IsCompleted => completedBurgerObj != null;
+    public Transform CookedPattyInputSlot => cookedPattyInputSlot;
+    public StationInputSlot InputSlotComponent => inputSlotComponent;
+    public int AccumulatedPattyInputCount => (inputSlotComponent != null) ? inputSlotComponent.CurrentCount : (cookedPattyInputSlot != null ? cookedPattyInputSlot.childCount : 0);
 
     public float UpgradedAssemblyTime { get => upgradedAssemblyTime; set => upgradedAssemblyTime = value; }
     public bool AutoAssembleOnPattyReceived { get => autoAssembleOnPattyReceived; set => autoAssembleOnPattyReceived = value; }
@@ -84,16 +90,148 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
     {
         if (assemblyPoint == null) assemblyPoint = transform;
 
+        if (cookedPattyInputSlot != null)
+        {
+            inputSlotComponent = cookedPattyInputSlot.GetComponent<StationInputSlot>();
+            if (inputSlotComponent == null) inputSlotComponent = cookedPattyInputSlot.gameObject.AddComponent<StationInputSlot>();
+            inputSlotComponent.StationOwner = this;
+            inputSlotComponent.StackOffset = pattyStackOffset;
+        }
+
         if (completedProductSlot != null)
         {
             StationOutputSlot slotComp = completedProductSlot.GetComponent<StationOutputSlot>();
             if (slotComp == null) slotComp = completedProductSlot.gameObject.AddComponent<StationOutputSlot>();
             slotComp.StationOwner = this;
+            slotComp.StackOffset = outputSlotStackOffset;
         }
+    }
+
+    public bool IsValidCookedPatty(ICarryable item)
+    {
+        if (item == null) return false;
+        ICookable cookable = item.gameObject.GetComponent<ICookable>();
+        if (cookable == null) return false;
+
+        if (recipeSO != null && recipeSO.RequiredIngredients != null && recipeSO.RequiredIngredients.Count > 0)
+        {
+            var primaryReq = recipeSO.RequiredIngredients[0];
+            if (primaryReq.requiredState != CookingState.Raw && cookable.CurrentState != primaryReq.requiredState)
+                return false;
+            if (primaryReq.ingredient != null && cookable.Data != null && cookable.Data != primaryReq.ingredient)
+                return false;
+            return true;
+        }
+
+        return cookable.CurrentState == CookingState.Cooked;
+    }
+
+    public bool HasPattyInInputSlot()
+    {
+        return AccumulatedPattyInputCount > 0;
+    }
+
+    public ICookable PopPattyFromInputSlot()
+    {
+        if (inputSlotComponent != null && inputSlotComponent.HasItems)
+        {
+            ICarryable item = inputSlotComponent.PopItem();
+            return item != null ? item.gameObject.GetComponent<ICookable>() : null;
+        }
+        else if (cookedPattyInputSlot != null && cookedPattyInputSlot.childCount > 0)
+        {
+            Transform topChild = cookedPattyInputSlot.GetChild(cookedPattyInputSlot.childCount - 1);
+            ICookable cookable = topChild.GetComponent<ICookable>();
+            topChild.SetParent(null);
+            return cookable;
+        }
+        return null;
+    }
+
+    public void CheckAutoAssembly()
+    {
+        if (HasIngredientsOnTable || IsCompleted) return;
+
+        if ((autoAssembleOnPattyReceived || currentUpgradeLevel >= 2) && HasPattyInInputSlot())
+        {
+            TryStartAssemblyFromInputSlot();
+        }
+    }
+
+    public bool TryStartAssemblyFromInputSlot()
+    {
+        if (HasIngredientsOnTable || IsCompleted || !HasPattyInInputSlot()) return false;
+
+        IKitchenInventory inventory = FindFirstObjectByType<GlobalKitchenInventory>();
+
+        if (recipeSO != null && recipeSO.RequiredIngredients != null && recipeSO.RequiredIngredients.Count > 0)
+        {
+            for (int i = 1; i < recipeSO.RequiredIngredients.Count; i++)
+            {
+                var extraReq = recipeSO.RequiredIngredients[i];
+                if (extraReq.ingredient != null)
+                {
+                    if (inventory == null || !inventory.HasIngredient(extraReq.ingredient))
+                    {
+                        Debug.LogWarning($"[MesaDeArmado] No hay '{extraReq.ingredient.IngredientName}' disponible en el inventario global.");
+                        return false;
+                    }
+                }
+            }
+
+            ICookable pattyToAssemble = PopPattyFromInputSlot();
+            if (pattyToAssemble == null) return false;
+
+            for (int i = 1; i < recipeSO.RequiredIngredients.Count; i++)
+            {
+                var extraReq = recipeSO.RequiredIngredients[i];
+                if (extraReq.ingredient != null && inventory != null)
+                {
+                    inventory.TryConsumeIngredient(extraReq.ingredient);
+                }
+            }
+
+            placedPatty = pattyToAssemble;
+            hasBun = true;
+            currentAssemblyTimer = 0f;
+
+            placedPatty.HoldableItem.PlaceAtPoint(assemblyPoint);
+            Collider2D col = placedPatty.gameObject.GetComponent<Collider2D>();
+            if (col != null) col.enabled = false;
+
+            Debug.Log($"[MesaDeArmado] Carne tomada del slot de entrada apilado. ¡Iniciando ensamblado de '{recipeSO.ProductName}'!");
+            return true;
+        }
+        else
+        {
+            if (inventory != null && inventory.HasIngredient(RequiredBun))
+            {
+                ICookable pattyToAssemble = PopPattyFromInputSlot();
+                if (pattyToAssemble == null) return false;
+
+                inventory.TryConsumeIngredient(RequiredBun);
+                placedPatty = pattyToAssemble;
+                hasBun = true;
+                currentAssemblyTimer = 0f;
+
+                placedPatty.HoldableItem.PlaceAtPoint(assemblyPoint);
+                Collider2D col = placedPatty.gameObject.GetComponent<Collider2D>();
+                if (col != null) col.enabled = false;
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void Update()
     {
+        if (!HasIngredientsOnTable && !IsCompleted)
+        {
+            CheckAutoAssembly();
+        }
+
         if (HasIngredientsOnTable && !IsCompleted)
         {
             float targetAssemblyTime = (currentUpgradeLevel >= 1) ? upgradedAssemblyTime : assemblyTime;
@@ -148,34 +286,6 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
                 }
             }
         }
-
-        UpdateSlotCountUI();
-    }
-
-    public void UpdateSlotCountUI()
-    {
-        int currentCount = AccumulatedSlotCount;
-        if (currentCount == lastSlotCount) return;
-
-        lastSlotCount = currentCount;
-        bool showText = currentCount > 0;
-        string textValue = showText ? $"{slotCountPrefix}{currentCount}" : "";
-
-        if (tmpSlotCountText != null)
-        {
-            tmpSlotCountText.text = textValue;
-            tmpSlotCountText.gameObject.SetActive(showText);
-        }
-        if (uiSlotCountText != null)
-        {
-            uiSlotCountText.text = textValue;
-            uiSlotCountText.gameObject.SetActive(showText);
-        }
-
-        if (completedProductSlot != null)
-        {
-            Debug.Log($"[MesaDeArmado] Productos acumulados en slot '{completedProductSlot.name}': {currentCount}");
-        }
     }
 
     public void Interact()
@@ -185,20 +295,6 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
         if (carrier == null) return;
 
         ICarryable itemInHand = carrier.GetCarriedItem();
-
-        // CASO 0: El jugador trae en las manos un producto ensamblado de esta mesa -> devolver al slot asignado
-        if (completedProductSlot != null && itemInHand != null && IsAssemblyProduct(itemInHand))
-        {
-            carrier.TakeCarriedItem();
-            itemInHand.PlaceAtPoint(completedProductSlot);
-
-            Collider2D col = itemInHand.gameObject.GetComponent<Collider2D>();
-            if (col != null) col.enabled = true;
-
-            UpdateSlotCountUI();
-            Debug.Log($"[MesaDeArmado] Producto ensamblado devuelto al slot de acumulación '{completedProductSlot.name}'. Total acumulados: {AccumulatedSlotCount}");
-            return;
-        }
 
         // CASO 1: Producto final completado en la mesa -> El jugador lo recoge
         if (completedBurgerObj != null)
@@ -224,9 +320,19 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
         // CASO 2: La mesa no tiene ingredientes cargados -> Validar e iniciar ensamblado
         if (!HasIngredientsOnTable)
         {
+            // 2A: Si hay carne cocinada apilada en el slot de entrada, tomarla para iniciar armado
+            if (HasPattyInInputSlot())
+            {
+                if (TryStartAssemblyFromInputSlot())
+                {
+                    return;
+                }
+            }
+
+            // 2B: Si no hay carnes en el slot de entrada, intentar tomar carne de las manos del jugador
             if (itemInHand == null)
             {
-                Debug.Log("[MesaDeArmado] Necesitas llevar un ingrediente en las manos para la receta.");
+                Debug.Log("[MesaDeArmado] Necesitas llevar una carne cocinada en las manos o tenerla en el slot de entrada.");
                 return;
             }
 
@@ -362,6 +468,8 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
         {
             Debug.LogError("[MesaDeArmado] ¡No se ha asignado un ResultPrefab en ProductSO ni en el Inspector!");
         }
+
+        CheckAutoAssembly();
     }
 
     public bool IsAssemblyProduct(ICarryable item)
@@ -413,11 +521,15 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
                 return "Ensamblando automáticamente...";
             return "Mantén [Click Izquierdo] para Ensamblar";
         }
+        if (HasPattyInInputSlot())
+        {
+            return "Ensamblar Carne Cocinada + Pan";
+        }
         return "Colocar Carne Cocinada + Pan";
     }
 
     /// <summary>
-    /// Limpia completamente la mesa de armado, destruyendo ingredientes en proceso y el producto final ensamblado.
+    /// Limpia completamente la mesa de armado, destruyendo ingredientes en proceso, los apilados y el producto final ensamblado.
     /// </summary>
     public void ResetStation()
     {
@@ -431,6 +543,18 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
         {
             Destroy(completedBurgerObj);
             completedBurgerObj = null;
+        }
+
+        if (inputSlotComponent != null)
+        {
+            inputSlotComponent.ResetSlot();
+        }
+        else if (cookedPattyInputSlot != null)
+        {
+            for (int i = cookedPattyInputSlot.childCount - 1; i >= 0; i--)
+            {
+                Destroy(cookedPattyInputSlot.GetChild(i).gameObject);
+            }
         }
 
         hasBun = false;
@@ -453,7 +577,6 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
             }
         }
 
-        UpdateSlotCountUI();
         Debug.Log($"[MesaDeArmado] Estación '{gameObject.name}' reseteada y limpiada.");
     }
 
@@ -463,6 +586,12 @@ public class MesaDeArmado : MonoBehaviour, IInteractable
         {
             Gizmos.color = Color.blue;
             Gizmos.DrawWireCube(assemblyPoint.position, new Vector3(0.5f, 0.5f, 0f));
+        }
+
+        if (cookedPattyInputSlot != null)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawWireCube(cookedPattyInputSlot.position, new Vector3(0.5f, 0.5f, 0f));
         }
     }
 }

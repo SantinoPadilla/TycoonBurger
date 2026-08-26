@@ -451,6 +451,45 @@ public class ShopUI : MonoBehaviour
                 }
             }
         }
+
+        // Actualizar tarjetas de mejora de velocidad del jugador en la tienda
+        PlayerSpeedUpgradeItemUI[] speedUpgrades = GetComponentsInChildren<PlayerSpeedUpgradeItemUI>(true);
+        if (speedUpgrades != null)
+        {
+            foreach (var upgradeUI in speedUpgrades)
+            {
+                if (upgradeUI != null)
+                {
+                    upgradeUI.UpdateDisplay(currentMoney);
+                }
+            }
+        }
+
+        // Actualizar tarjetas de mejora de capacidad del jugador en la tienda
+        PlayerCapacityUpgradeItemUI[] capacityUpgrades = GetComponentsInChildren<PlayerCapacityUpgradeItemUI>(true);
+        if (capacityUpgrades != null)
+        {
+            foreach (var upgradeUI in capacityUpgrades)
+            {
+                if (upgradeUI != null)
+                {
+                    upgradeUI.UpdateDisplay(currentMoney);
+                }
+            }
+        }
+
+        // Actualizar tarjetas de mejora de profit / ganancias en la tienda
+        ProfitUpgradeItemUI[] profitUpgrades = GetComponentsInChildren<ProfitUpgradeItemUI>(true);
+        if (profitUpgrades != null)
+        {
+            foreach (var upgradeUI in profitUpgrades)
+            {
+                if (upgradeUI != null)
+                {
+                    upgradeUI.UpdateDisplay(currentMoney);
+                }
+            }
+        }
     }
 
     private void SubscribeEvents()

@@ -53,6 +53,20 @@ public class HoldableItem : MonoBehaviour, ICarryable, IInteractable
         {
             transform.localScale = originalScale;
         }
+
+        StationOutputSlot outputSlot = targetPoint.GetComponent<StationOutputSlot>();
+        if (outputSlot != null)
+        {
+            outputSlot.UpdateStackVisuals();
+        }
+        else
+        {
+            StationInputSlot inputSlot = targetPoint.GetComponent<StationInputSlot>();
+            if (inputSlot != null)
+            {
+                inputSlot.UpdateStackVisuals();
+            }
+        }
     }
 
     /// <summary>

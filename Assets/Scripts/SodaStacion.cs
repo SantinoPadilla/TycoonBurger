@@ -24,13 +24,8 @@ public class SodaStacion : MonoBehaviour, IInteractable
     [Header("Slot de Acumulación (Salida)")]
     [Tooltip("Transform/Slot asignado a donde se moverán los productos de Soda producidos para acumularse.")]
     [SerializeField] private Transform productOutputSlot;
-
-    [Header("UI Contador de Productos Acumulados (Opcional)")]
-    [Tooltip("Componente TextMeshProUGUI (opcional) para mostrar cuántas sodas hay acumuladas en el slot.")]
-    [SerializeField] private TextMeshProUGUI tmpSlotCountText;
-    [Tooltip("Componente Text de Unity UI tradicional (opcional) para mostrar cuántas sodas hay acumuladas en el slot.")]
-    [SerializeField] private Text uiSlotCountText;
-    [SerializeField] private string slotCountPrefix = "Soda: ";
+    [Tooltip("Desplazamiento vertical entre productos apilados en el slot de salida.")]
+    [SerializeField] private Vector3 outputSlotStackOffset = new Vector3(0f, 0.4f, 0f);
 
     [Header("Componente QTE UI")]
     [Tooltip("Referencia al componente de UI que gestiona la barra de QTE.")]
@@ -45,15 +40,36 @@ public class SodaStacion : MonoBehaviour, IInteractable
     public UnityEvent onQTESucceeded;
     public UnityEvent onQTEFailed;
 
+    [Header("Configuración de Mejoras")]
+    [Tooltip("Proporción ampliada de la zona verde de éxito del QTE al activar la mejora (ej. 0.35 = 35% del ancho de la barra). Modificable en el Inspector.")]
+    [SerializeField] private float upgradedGreenCenterRatio = 0.35f;
+
     private bool isQTEActive = false;
-    private int lastSlotCount = -1;
+    private int currentUpgradeLevel = 0;
 
     public bool IsQTEActive => isQTEActive;
+    public float UpgradedGreenCenterRatio { get => upgradedGreenCenterRatio; set => upgradedGreenCenterRatio = value; }
+    public int CurrentUpgradeLevel => currentUpgradeLevel;
 
     /// <summary>
     /// Cantidad de productos de soda acumulados actualmente en el slot de salida.
     /// </summary>
     public int AccumulatedSlotCount => productOutputSlot != null ? productOutputSlot.childCount : 0;
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la estación de soda.
+    /// Nivel 1: Desbloqueo estación Soda (manejado en UI).
+    /// Nivel 2: Agranda la zona de éxito del centro verde del QTE.
+    /// </summary>
+    public void SetUpgradeLevel(int level)
+    {
+        currentUpgradeLevel = Mathf.Max(0, level);
+        if (qteUI != null)
+        {
+            qteUI.UpgradedGreenCenterRatio = upgradedGreenCenterRatio;
+            qteUI.SetUpgradeLevel(currentUpgradeLevel);
+        }
+    }
 
     public GameObject EffectiveProductPrefab
     {
@@ -76,34 +92,7 @@ public class SodaStacion : MonoBehaviour, IInteractable
             StationOutputSlot slotComp = productOutputSlot.GetComponent<StationOutputSlot>();
             if (slotComp == null) slotComp = productOutputSlot.gameObject.AddComponent<StationOutputSlot>();
             slotComp.StationOwner = this;
-        }
-        UpdateSlotCountUI();
-    }
-
-    private void Update()
-    {
-        UpdateSlotCountUI();
-    }
-
-    public void UpdateSlotCountUI()
-    {
-        if (productOutputSlot == null) return;
-        int currentCount = AccumulatedSlotCount;
-        if (currentCount == lastSlotCount) return;
-
-        lastSlotCount = currentCount;
-        bool hasItems = currentCount > 0;
-        string textValue = hasItems ? $"{slotCountPrefix}{currentCount}" : "";
-
-        if (tmpSlotCountText != null)
-        {
-            tmpSlotCountText.text = textValue;
-            tmpSlotCountText.gameObject.SetActive(hasItems);
-        }
-        if (uiSlotCountText != null)
-        {
-            uiSlotCountText.text = textValue;
-            uiSlotCountText.gameObject.SetActive(hasItems);
+            slotComp.StackOffset = outputSlotStackOffset;
         }
     }
 
@@ -120,20 +109,6 @@ public class SodaStacion : MonoBehaviour, IInteractable
 
         // CASO B: El QTE NO está activo (1ra Interacción: Intentar iniciar preparación)
         ICarryable itemInHand = carrier != null ? carrier.GetCarriedItem() : null;
-
-        // CASO 0: El jugador trae en las manos un producto de soda -> devolver al slot asignado
-        if (productOutputSlot != null && itemInHand != null && IsSodaProduct(itemInHand))
-        {
-            carrier.TakeCarriedItem();
-            itemInHand.PlaceAtPoint(productOutputSlot);
-
-            Collider2D col = itemInHand.gameObject.GetComponent<Collider2D>();
-            if (col != null) col.enabled = true;
-
-            UpdateSlotCountUI();
-            Debug.Log($"[SodaStacion] Producto de Soda devuelto al slot de acumulación '{productOutputSlot.name}'. Total acumulados: {AccumulatedSlotCount}");
-            return;
-        }
 
         Ingredient ingredientInHand = itemInHand != null ? itemInHand.gameObject.GetComponent<Ingredient>() : null;
 
@@ -304,7 +279,6 @@ public class SodaStacion : MonoBehaviour, IInteractable
             }
         }
 
-        UpdateSlotCountUI();
         Debug.Log($"[SodaStacion] Estación '{gameObject.name}' reseteada y limpiada.");
     }
 

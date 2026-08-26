@@ -19,3 +19,6 @@ MonoBehaviour:
   - levelNumber: 1
     price: 250
     description: unlock soda stacion
+  - levelNumber: 1
+    price: 300
+    description: facilita el QTE

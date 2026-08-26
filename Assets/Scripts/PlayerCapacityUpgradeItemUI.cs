@@ -3,36 +3,34 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Componente de UI dedicado exclusivamente para las mejoras de la Estación de Soda/Gaseosa (SodaStacion) en el panel 'MejorasPanel'.
-/// Administra el nivel alcanzado y activa/desactiva automáticamente los elementos vinculados:
-/// Nivel 1:
-/// 1. Estación de Soda en cocina.
-/// 2. Tarjeta del ingrediente de Soda en la tienda de insumos.
-/// 3. Slot de Soda en la barra de inventario del HUD.
-/// 4. Objeto de Soda en el resumen del turno (ShiftResume).
-/// 5. Registra el ProductSO de Soda en los pedidos de CustomerSpawner.
+/// Componente de UI dedicado exclusivamente para la mejora de Capacidad de Carga del Jugador (Player Capacity) en el panel 'MejorasPanel'.
+/// Administra el nivel alcanzado y aplica el valor de capacidad máxima a PlayerCarrySystem:
+/// Nivel 1: Capacidad asignada en Inspector (level1Capacity, por defecto 2).
+/// Nivel 2: Capacidad asignada en Inspector (level2Capacity, por defecto 3).
+/// Nivel 3: Capacidad asignada en Inspector (level3Capacity, por defecto 4).
 /// </summary>
-public class SodaUpgradeItemUI : MonoBehaviour
+public class PlayerCapacityUpgradeItemUI : MonoBehaviour
 {
     [Header("Configuración de la Mejora (ScriptableObject)")]
-    [Tooltip("ScriptableObject de datos de la mejora de la Soda (ej. Upgrade_Soda).")]
+    [Tooltip("ScriptableObject de datos de la mejora de capacidad del jugador (ej. Upgrade_PlayerCapacity).")]
     [SerializeField] private UpgradeDataSO upgradeData;
 
-    [Header("Desbloqueos del Nivel 1 (Escena, Tienda, HUD y Resumen)")]
-    [Tooltip("1. Objeto o estación física de la SodaStacion en la cocina.")]
-    [SerializeField] private GameObject sodaStationObject;
+    [Header("Referencia al Sistema de Carga del Jugador")]
+    [Tooltip("Componente PlayerCarrySystem al cual aplicar la nueva capacidad de carga. Si está vacío, se buscará en la escena.")]
+    [SerializeField] private PlayerCarrySystem playerCarrySystem;
 
-    [Tooltip("2. Tarjeta del ingrediente Soda en el panel de insumos de la tienda (ShopItemUI).")]
-    [SerializeField] private ShopItemUI sodaShopItem;
+    [Header("Valores de Capacidad por Nivel")]
+    [Tooltip("Capacidad por defecto en Nivel 0 (sin mejoras).")]
+    [SerializeField] private int defaultCapacity = 1;
 
-    [Tooltip("3. Slot del ingrediente Soda en la barra de inventario del HUD (KitchenInventorySlotUI).")]
-    [SerializeField] private KitchenInventorySlotUI sodaInventorySlot;
+    [Tooltip("Cantidad de ítems máximos a llevar en Nivel 1.")]
+    [SerializeField] private int level1Capacity = 2;
 
-    [Tooltip("4. Objeto o casilla de Soda vendida en el panel de resumen de servicio (ShiftSummaryUI).")]
-    [SerializeField] private GameObject shiftResumeSodaObject;
+    [Tooltip("Cantidad de ítems máximos a llevar en Nivel 2.")]
+    [SerializeField] private int level2Capacity = 3;
 
-    [Tooltip("5. ProductSO de Soda a incorporar al menú de pedidos de los clientes en CustomerSpawner al desbloquear.")]
-    [SerializeField] private ProductSO sodaProductSO;
+    [Tooltip("Cantidad de ítems máximos a llevar en Nivel 3.")]
+    [SerializeField] private int level3Capacity = 4;
 
     [Header("Referencias Visuales UI")]
     [SerializeField] private Image iconImage;
@@ -98,7 +96,7 @@ public class SodaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Actualiza el estado visual de la tarjeta de Soda y aplica los desbloqueos correspondientes.
+    /// Actualiza el estado visual de la tarjeta de capacidad y aplica la capacidad correspondiente.
     /// </summary>
     public void UpdateDisplay(int currentMoney)
     {
@@ -108,14 +106,14 @@ public class SodaUpgradeItemUI : MonoBehaviour
         int currentLevel = (mgr != null) ? mgr.GetUpgradeLevel(upgradeData.UpgradeId) : 0;
         bool isMax = (mgr != null) ? mgr.IsMaxLevel(upgradeData) : (currentLevel >= upgradeData.MaxLevel);
 
-        // Aplicar activación/desactivación de los elementos según el nivel
+        // Aplicar capacidad de carga al jugador
         ApplyUnlocks(currentLevel);
 
         if (isMax)
         {
             SetText(tmpLevelText, uiLevelText, $"Nivel: {currentLevel} (MÁXIMO)");
             SetText(tmpPriceText, uiPriceText, "COMPRADO");
-            SetText(tmpDescText, uiDescText, "Mejora completada al máximo.");
+            SetText(tmpDescText, uiDescText, "Capacidad mejorada al máximo.");
             SetText(tmpButtonText, uiButtonText, "Máximo");
 
             if (buyButton != null) buyButton.interactable = false;
@@ -125,10 +123,10 @@ public class SodaUpgradeItemUI : MonoBehaviour
             int nextLevel = currentLevel + 1;
             UpgradeLevelConfig nextConfig = upgradeData.GetLevelConfig(nextLevel);
 
-            SetText(tmpLevelText, uiLevelText, currentLevel > 0 ? $"Nivel actual: {currentLevel}" : "Bloqueada");
+            SetText(tmpLevelText, uiLevelText, currentLevel > 0 ? $"Nivel actual: {currentLevel}" : "Sin mejoras");
             SetText(tmpPriceText, uiPriceText, $"${nextConfig.price}");
             SetText(tmpDescText, uiDescText, nextConfig.description);
-            SetText(tmpButtonText, uiButtonText, currentLevel == 0 ? "Desbloquear" : "Mejorar");
+            SetText(tmpButtonText, uiButtonText, currentLevel == 0 ? "Comprar Lvl 1" : "Mejorar");
 
             if (buyButton != null)
             {
@@ -138,57 +136,29 @@ public class SodaUpgradeItemUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Activa o desactiva los elementos del juego y la UI según el nivel alcanzado en la Estación de Soda.
+    /// Aplica el límite de capacidad de carga a PlayerCarrySystem según el nivel alcanzado.
     /// </summary>
     private void ApplyUnlocks(int currentLevel)
     {
-        // Nivel >= 1 desbloquea la estación de Soda y sus componentes vinculados
-        bool isUnlocked = (currentLevel >= 1);
+        PlayerCarrySystem carrySystem = (playerCarrySystem != null) ? playerCarrySystem : FindFirstObjectByType<PlayerCarrySystem>(FindObjectsInactive.Include);
+        if (carrySystem == null) return;
 
-        // 1. Estación de Soda en la cocina
-        if (sodaStationObject != null && sodaStationObject.activeSelf != isUnlocked)
+        int targetCapacity = defaultCapacity;
+        switch (currentLevel)
         {
-            sodaStationObject.SetActive(isUnlocked);
+            case 1:
+                targetCapacity = level1Capacity;
+                break;
+            case 2:
+                targetCapacity = level2Capacity;
+                break;
+            case 3:
+            default:
+                if (currentLevel >= 3) targetCapacity = level3Capacity;
+                break;
         }
 
-        // 2. Tarjeta del ingrediente Soda en la tienda de insumos
-        if (sodaShopItem != null && sodaShopItem.gameObject.activeSelf != isUnlocked)
-        {
-            sodaShopItem.gameObject.SetActive(isUnlocked);
-        }
-
-        // 3. Slot del ingrediente Soda en la barra de inventario del HUD
-        if (sodaInventorySlot != null && sodaInventorySlot.gameObject.activeSelf != isUnlocked)
-        {
-            sodaInventorySlot.gameObject.SetActive(isUnlocked);
-        }
-
-        // 4. Objeto de Soda vendida en la pantalla de resumen del servicio (ShiftResume)
-        if (shiftResumeSodaObject != null && shiftResumeSodaObject.activeSelf != isUnlocked)
-        {
-            shiftResumeSodaObject.SetActive(isUnlocked);
-        }
-
-        // 5. Agregar o remover el ProductSO de Soda de los pedidos de clientes en CustomerSpawner
-        CustomerSpawner spawner = FindFirstObjectByType<CustomerSpawner>(FindObjectsInactive.Include);
-        if (spawner != null && sodaProductSO != null)
-        {
-            if (isUnlocked)
-            {
-                spawner.AddAvailableProduct(sodaProductSO);
-            }
-            else
-            {
-                spawner.RemoveAvailableProduct(sodaProductSO);
-            }
-        }
-
-        // Habilitar la lógica de mejoras en el script SodaStacion (Nivel 1: Estación, Nivel 2: Zona verde QTE ampliada)
-        SodaStacion station = (sodaStationObject != null) ? sodaStationObject.GetComponent<SodaStacion>() : FindFirstObjectByType<SodaStacion>(FindObjectsInactive.Include);
-        if (station != null)
-        {
-            station.SetUpgradeLevel(currentLevel);
-        }
+        carrySystem.SetMaxCapacity(targetCapacity);
     }
 
     private void OnBuyButtonClicked()
@@ -198,7 +168,7 @@ public class SodaUpgradeItemUI : MonoBehaviour
         UpgradeManager mgr = UpgradeManager.Instance ?? FindFirstObjectByType<UpgradeManager>();
         if (mgr == null)
         {
-            Debug.LogWarning("[SodaUpgradeItemUI] No se encontró UpgradeManager en la escena.");
+            Debug.LogWarning("[PlayerCapacityUpgradeItemUI] No se encontró UpgradeManager en la escena.");
             return;
         }
 

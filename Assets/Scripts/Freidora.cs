@@ -37,25 +37,31 @@ public class Freidora : MonoBehaviour, IInteractable
     [Header("Slot de Destino (Cocinado)")]
     [Tooltip("Slot/Transform asignado en el Inspector a donde se moverán las papas al estar en punto Cooked. Si no está asignado, irán a las manos del jugador.")]
     [SerializeField] private Transform cookedProductSlot;
-
-    [Header("UI Contador de Productos Acumulados")]
-    [Tooltip("Componente TextMeshProUGUI (opcional) para mostrar cuántos productos hay acumulados en el slot.")]
-    [SerializeField] private TextMeshProUGUI tmpSlotCountText;
-    [Tooltip("Componente Text de Unity UI tradicional (opcional) para mostrar cuántos productos hay acumulados en el slot.")]
-    [SerializeField] private Text uiSlotCountText;
-    [SerializeField] private string slotCountPrefix = "Papas: ";
+    [Tooltip("Desplazamiento vertical entre productos apilados en el slot de salida.")]
+    [SerializeField] private Vector3 outputSlotStackOffset = new Vector3(0f, 0.4f, 0f);
 
     [Header("Inventario Global / Auto-Carga")]
     [SerializeField] private bool useGlobalInventory = true;
 
+    [Header("Configuración de Mejoras")]
+    [Tooltip("Multiplicador de velocidad de fritura al activar la mejora de reducción de tiempo (ej. 1.5 = 50% más rápido). Modificable en el Inspector.")]
+    [SerializeField] private float cookSpeedMultiplier = 1.5f;
+
+    [Tooltip("Si es verdadero, al estar las papas doradas (Cooked) se transfieren automáticamente como Papas Fritas al slot de ingredientes acumulados.")]
+    [SerializeField] private bool autoRemoveCooked = false;
+
     private ICookable item1;
     private ICookable item2;
-    private int lastSlotCount = -1;
+    private int currentUpgradeLevel = 0;
 
     public bool IsSlot1Occupied => item1 != null;
     public bool IsSlot2Occupied => item2 != null;
     public bool IsFull => IsSlot1Occupied && (!enableSlot2 || IsSlot2Occupied);
     public bool EnableSlot2 { get => enableSlot2; set => enableSlot2 = value; }
+    public float CookSpeedMultiplier { get => cookSpeedMultiplier; set => cookSpeedMultiplier = value; }
+    public bool AutoRemoveCooked { get => autoRemoveCooked; set => autoRemoveCooked = value; }
+    public int CurrentUpgradeLevel => currentUpgradeLevel;
+    public float EffectiveCookSpeedMultiplier => (currentUpgradeLevel >= 3) ? cookSpeedMultiplier : 1.0f;
 
     /// <summary>
     /// Cantidad de productos acumulados actualmente en el slot de destino.
@@ -64,6 +70,23 @@ public class Freidora : MonoBehaviour, IInteractable
 
     public GameObject EffectiveRawPrefab => (rawIngredientSO != null && rawIngredientSO.Prefab != null) ? rawIngredientSO.Prefab : rawIngredientPrefab;
     public GameObject EffectiveResultPrefab => (cookedProductSO != null && cookedProductSO.ResultPrefab != null) ? cookedProductSO.ResultPrefab : friesProductPrefab;
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la freidora.
+    /// Nivel 1: Desbloquea la freidora (manejado en UI).
+    /// Nivel 2: Activa el slot 2.
+    /// Nivel 3: Reduce el tiempo de fritura/cocción (cookSpeedMultiplier).
+    /// Nivel 4: Activa el retirado automático al slot de productos acumulados.
+    /// </summary>
+    public void SetUpgradeLevel(int level)
+    {
+        currentUpgradeLevel = Mathf.Max(0, level);
+        enableSlot2 = (currentUpgradeLevel >= 2);
+        if (currentUpgradeLevel >= 4)
+        {
+            autoRemoveCooked = true;
+        }
+    }
 
     private void Awake()
     {
@@ -74,6 +97,7 @@ public class Freidora : MonoBehaviour, IInteractable
             StationOutputSlot slotComp = cookedProductSlot.GetComponent<StationOutputSlot>();
             if (slotComp == null) slotComp = cookedProductSlot.gameObject.AddComponent<StationOutputSlot>();
             slotComp.StationOwner = this;
+            slotComp.StackOffset = outputSlotStackOffset;
         }
     }
 
@@ -82,7 +106,8 @@ public class Freidora : MonoBehaviour, IInteractable
         // 1. Fritura Puesto 1
         if (item1 != null)
         {
-            item1.Cook(Time.deltaTime);
+            float speedMult = EffectiveCookSpeedMultiplier;
+            item1.Cook(Time.deltaTime * speedMult);
             if (progressBarUI1 != null)
             {
                 progressBarUI1.UpdateProgress(
@@ -90,12 +115,36 @@ public class Freidora : MonoBehaviour, IInteractable
                     item1.CookedThresholdNormalized
                 );
             }
+
+            // Retirado automático al estar doradas/cocinadas (Cooked)
+            if ((autoRemoveCooked || currentUpgradeLevel >= 4) && item1.CurrentState == CookingState.Cooked && cookedProductSlot != null)
+            {
+                ICookable targetItem = item1;
+                RemoveItemFromFryer(targetItem);
+                Destroy(targetItem.gameObject);
+
+                GameObject resultPrefab = EffectiveResultPrefab;
+                if (resultPrefab != null)
+                {
+                    GameObject friesObj = Instantiate(resultPrefab, transform.position, Quaternion.identity);
+                    ICarryable friesCarryable = friesObj.GetComponent<ICarryable>();
+
+                    if (friesCarryable != null)
+                    {
+                        friesCarryable.PlaceAtPoint(cookedProductSlot);
+                        Collider2D col = friesObj.GetComponent<Collider2D>();
+                        if (col != null) col.enabled = true;
+                        Debug.Log($"[Freidora] (Auto-Retirado) Papas Fritas (Cooked) movidas automáticamente al slot '{cookedProductSlot.name}'.");
+                    }
+                }
+            }
         }
 
         // 2. Fritura Puesto 2
         if (enableSlot2 && item2 != null)
         {
-            item2.Cook(Time.deltaTime);
+            float speedMult = EffectiveCookSpeedMultiplier;
+            item2.Cook(Time.deltaTime * speedMult);
             if (progressBarUI2 != null)
             {
                 progressBarUI2.UpdateProgress(
@@ -103,35 +152,29 @@ public class Freidora : MonoBehaviour, IInteractable
                     item2.CookedThresholdNormalized
                 );
             }
-        }
 
-        // 3. Actualizar texto de UI con los productos acumulados en el slot
-        UpdateSlotCountUI();
-    }
+            // Retirado automático al estar doradas/cocinadas (Cooked)
+            if ((autoRemoveCooked || currentUpgradeLevel >= 4) && item2.CurrentState == CookingState.Cooked && cookedProductSlot != null)
+            {
+                ICookable targetItem = item2;
+                RemoveItemFromFryer(targetItem);
+                Destroy(targetItem.gameObject);
 
-    public void UpdateSlotCountUI()
-    {
-        int currentCount = AccumulatedSlotCount;
-        if (currentCount == lastSlotCount) return;
+                GameObject resultPrefab = EffectiveResultPrefab;
+                if (resultPrefab != null)
+                {
+                    GameObject friesObj = Instantiate(resultPrefab, transform.position, Quaternion.identity);
+                    ICarryable friesCarryable = friesObj.GetComponent<ICarryable>();
 
-        lastSlotCount = currentCount;
-        bool showText = currentCount > 0;
-        string textValue = showText ? $"{slotCountPrefix}{currentCount}" : "";
-
-        if (tmpSlotCountText != null)
-        {
-            tmpSlotCountText.text = textValue;
-            tmpSlotCountText.gameObject.SetActive(showText);
-        }
-        if (uiSlotCountText != null)
-        {
-            uiSlotCountText.text = textValue;
-            uiSlotCountText.gameObject.SetActive(showText);
-        }
-
-        if (cookedProductSlot != null)
-        {
-            Debug.Log($"[Freidora] Productos acumulados en slot '{cookedProductSlot.name}': {currentCount}");
+                    if (friesCarryable != null)
+                    {
+                        friesCarryable.PlaceAtPoint(cookedProductSlot);
+                        Collider2D col = friesObj.GetComponent<Collider2D>();
+                        if (col != null) col.enabled = true;
+                        Debug.Log($"[Freidora] (Auto-Retirado) Papas Fritas (Cooked) movidas automáticamente al slot '{cookedProductSlot.name}'.");
+                    }
+                }
+            }
         }
     }
 
@@ -145,20 +188,6 @@ public class Freidora : MonoBehaviour, IInteractable
 
         ICarryable itemInHand = carrier != null ? carrier.GetCarriedItem() : null;
         ICookable cookableInHand = itemInHand != null ? itemInHand.gameObject.GetComponent<ICookable>() : null;
-
-        // CASO 0: El jugador trae en las manos el producto cocinado de papas -> devolver al slot asignado
-        if (cookedProductSlot != null && itemInHand != null && IsFreidoraProduct(itemInHand))
-        {
-            carrier.TakeCarriedItem();
-            itemInHand.PlaceAtPoint(cookedProductSlot);
-
-            Collider2D col = itemInHand.gameObject.GetComponent<Collider2D>();
-            if (col != null) col.enabled = true;
-
-            UpdateSlotCountUI();
-            Debug.Log($"[Freidora] Producto de papas devuelto al slot de acumulación '{cookedProductSlot.name}'. Total acumulados: {AccumulatedSlotCount}");
-            return;
-        }
 
         // CASO A: Trae ingrediente válido en las manos y hay un puesto libre -> Freír
         if (cookableInHand != null && cookableInHand.CurrentState == CookingState.Raw && closestEmptyPoint != null)
@@ -441,7 +470,6 @@ public class Freidora : MonoBehaviour, IInteractable
             }
         }
 
-        UpdateSlotCountUI();
         Debug.Log($"[Freidora] Estación '{gameObject.name}' reseteada y limpiada.");
     }
 

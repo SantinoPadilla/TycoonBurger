@@ -36,6 +36,9 @@ public class PuntoDeVenta : MonoBehaviour, IInteractable
                 earnedMoney = sellable.SellPrice;
             }
 
+            // Aplicar multiplicador de ganancias de la mejora de Profit si aplica
+            earnedMoney = ProfitUpgradeItemUI.ApplyProfitMultiplier(earnedMoney);
+
             carrier.TakeCarriedItem();
 
             IMoneyService moneyService = FindFirstObjectByType<MoneyManager>();

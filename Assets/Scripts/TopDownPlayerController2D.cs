@@ -28,6 +28,19 @@ public class TopDownPlayerController2D : MonoBehaviour
 {
     [Header("Movimiento")]
     [SerializeField] private float moveSpeed = 5f;
+    private float speedBonus = 0f;
+
+    public float BaseMoveSpeed => moveSpeed;
+    public float SpeedBonus => speedBonus;
+    public float EffectiveMoveSpeed => moveSpeed + speedBonus;
+
+    /// <summary>
+    /// Establéce la bonificación adicional de velocidad otorgada por la mejora de Player Speed.
+    /// </summary>
+    public void SetSpeedBonus(float bonus)
+    {
+        speedBonus = Mathf.Max(0f, bonus);
+    }
 
     [Header("Interacción")]
     [Tooltip("Punto opcional de interacción (ej. objeto hijo en las manos). Si está vacío, usa la posición del jugador + Offset.")]
@@ -273,7 +286,7 @@ public class TopDownPlayerController2D : MonoBehaviour
             return;
         }
 
-        rb.MovePosition(rb.position + moveInput * moveSpeed * Time.fixedDeltaTime);
+        rb.MovePosition(rb.position + moveInput * EffectiveMoveSpeed * Time.fixedDeltaTime);
     }
 
     private void TryInteract()
@@ -369,10 +382,10 @@ public class TopDownPlayerController2D : MonoBehaviour
 
             if (holdingItem)
             {
-                // Al llevar objetos, priorizar depósitos, clientes y mesas
+                // Al llevar objetos, priorizar depósitos, clientes, slots de entrada/salida y mesas
                 if (interactable is CookingGrill || interactable is Freidora || interactable is MesaDeArmado ||
                     interactable is SodaStacion || interactable is PuntoDeVenta || interactable is Customer ||
-                    interactable is StationOutputSlot)
+                    interactable is StationOutputSlot || interactable is StationInputSlot)
                 {
                     score += 10f;
                 }
@@ -380,7 +393,7 @@ public class TopDownPlayerController2D : MonoBehaviour
             else
             {
                 // Con manos libres, priorizar recoger objetos o tomar ítems de ranuras
-                if (interactable is ICarryable || interactable is StationOutputSlot || interactable is IngredientContainer)
+                if (interactable is ICarryable || interactable is StationOutputSlot || interactable is StationInputSlot || interactable is IngredientContainer)
                 {
                     score += 10f;
                 }

@@ -137,28 +137,11 @@ public class PlanchaUpgradeItemUI : MonoBehaviour
             planchaSlot2ExtensionObject.SetActive(lvl1Unlocked);
         }
 
-        // Habilitar la lógica del segundo puesto en el script CookingGrill
+        // Habilitar la lógica de mejoras en el script CookingGrill (Nivel 1: Slot 2, Nivel 2: Tiempo Reducido, Nivel 3: Retirado Automático)
         CookingGrill grillComp = (planchaStation != null) ? planchaStation : FindFirstObjectByType<CookingGrill>(FindObjectsInactive.Include);
-        if (grillComp != null && grillComp.EnableSlot2 != lvl1Unlocked)
+        if (grillComp != null)
         {
-            grillComp.EnableSlot2 = lvl1Unlocked;
-        }
-
-        // Lógica específica para Niveles 2 al 5 (Reservada para futuras mejoras)
-        switch (currentLevel)
-        {
-            case 2:
-                // TODO: Lógica para Plancha Nivel 2
-                break;
-            case 3:
-                // TODO: Lógica para Plancha Nivel 3
-                break;
-            case 4:
-                // TODO: Lógica para Plancha Nivel 4
-                break;
-            case 5:
-                // TODO: Lógica para Plancha Nivel 5
-                break;
+            grillComp.SetUpgradeLevel(currentLevel);
         }
     }
 

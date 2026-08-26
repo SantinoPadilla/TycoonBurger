@@ -10,21 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 39b5867cdcdcdfd46a38ab2fd1c79e05, type: 3}
-  m_Name: Freidora
+  m_Name: Profit
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDataSO
-  upgradeId: freidora
-  upgradeName: Frair
+  upgradeId: Profit
+  upgradeName: Profit
   icon: {fileID: 0}
   levels:
   - levelNumber: 1
-    price: 75
-    description: Unlock Freir and potatos fries
+    price: 10
+    description: 
   - levelNumber: 2
-    price: 150
-    description: Unlock new slot for fry potatos
+    price: 20
+    description: 
   - levelNumber: 3
-    price: 175
-    description: reduce el tiempo de coccion
-  - levelNumber: 4
-    price: 200
-    description: retira automaticamente los ingredientes cocidos
+    price: 30
+    description: 

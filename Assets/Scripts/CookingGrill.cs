@@ -31,23 +31,28 @@ public class CookingGrill : MonoBehaviour, IInteractable
     [Header("Slot de Destino (Cocinado)")]
     [Tooltip("Slot/Transform asignado en el Inspector a donde se moverá la hamburguesa al estar cocinada (Cooked). Si no está asignado, irá a las manos del jugador.")]
     [SerializeField] private Transform cookedBurgerSlot;
+    [Tooltip("Desplazamiento vertical entre productos apilados en el slot de salida.")]
+    [SerializeField] private Vector3 outputSlotStackOffset = new Vector3(0f, 0.4f, 0f);
 
-    [Header("UI Contador de Productos Acumulados")]
-    [Tooltip("Componente TextMeshProUGUI (opcional) para mostrar cuántos productos hay acumulados en el slot.")]
-    [SerializeField] private TextMeshProUGUI tmpSlotCountText;
-    [Tooltip("Componente Text de Unity UI tradicional (opcional) para mostrar cuántos productos hay acumulados en el slot.")]
-    [SerializeField] private Text uiSlotCountText;
-    [SerializeField] private string slotCountPrefix = "Hamburguesas: ";
+    [Header("Configuración de Mejoras")]
+    [Tooltip("Multiplicador de velocidad de cocción al activar la mejora de reducción de tiempo (ej. 1.5 = 50% más rápido). Modificable en el Inspector.")]
+    [SerializeField] private float cookSpeedMultiplier = 1.5f;
+
+    [Tooltip("Si es verdadero, al estar la hamburguesa cocinada (Cooked) se moverá automáticamente al slot de ingredientes acumulados.")]
+    [SerializeField] private bool autoRemoveCooked = false;
 
     private ICookable ingredient1;
     private ICookable ingredient2;
-    private int lastSlotCount = -1;
+    private int currentUpgradeLevel = 0;
 
     public bool IsSlot1Occupied => ingredient1 != null;
     public bool IsSlot2Occupied => ingredient2 != null;
     public bool IsFull => IsSlot1Occupied && (!enableSlot2 || IsSlot2Occupied);
     public bool EnableSlot2 { get => enableSlot2; set => enableSlot2 = value; }
-
+    public float CookSpeedMultiplier { get => cookSpeedMultiplier; set => cookSpeedMultiplier = value; }
+    public bool AutoRemoveCooked { get => autoRemoveCooked; set => autoRemoveCooked = value; }
+    public int CurrentUpgradeLevel => currentUpgradeLevel;
+    public float EffectiveCookSpeedMultiplier => (currentUpgradeLevel >= 2) ? cookSpeedMultiplier : 1.0f;
 
     /// <summary>
     /// Cantidad de productos acumulados actualmente en el slot de destino.
@@ -55,6 +60,22 @@ public class CookingGrill : MonoBehaviour, IInteractable
     public int AccumulatedSlotCount => cookedBurgerSlot != null ? cookedBurgerSlot.childCount : 0;
 
     public GameObject EffectivePrefab => (ingredientSO != null && ingredientSO.Prefab != null) ? ingredientSO.Prefab : burgerPrefab;
+
+    /// <summary>
+    /// Aplica el nivel de mejora a la plancha de cocina.
+    /// Nivel 1: Activa el slot 2.
+    /// Nivel 2: Reduce el tiempo de cocción (cookSpeedMultiplier).
+    /// Nivel 3: Activa el retirado automático al slot de productos acumulados.
+    /// </summary>
+    public void SetUpgradeLevel(int level)
+    {
+        currentUpgradeLevel = Mathf.Max(0, level);
+        enableSlot2 = (currentUpgradeLevel >= 1);
+        if (currentUpgradeLevel >= 3)
+        {
+            autoRemoveCooked = true;
+        }
+    }
 
     private void Awake()
     {
@@ -65,6 +86,7 @@ public class CookingGrill : MonoBehaviour, IInteractable
             StationOutputSlot slotComp = cookedBurgerSlot.GetComponent<StationOutputSlot>();
             if (slotComp == null) slotComp = cookedBurgerSlot.gameObject.AddComponent<StationOutputSlot>();
             slotComp.StationOwner = this;
+            slotComp.StackOffset = outputSlotStackOffset;
         }
     }
 
@@ -73,7 +95,8 @@ public class CookingGrill : MonoBehaviour, IInteractable
         // 1. Actualizar cocción del Puesto 1
         if (ingredient1 != null)
         {
-            ingredient1.Cook(Time.deltaTime);
+            float speedMult = EffectiveCookSpeedMultiplier;
+            ingredient1.Cook(Time.deltaTime * speedMult);
             if (progressBarUI1 != null)
             {
                 progressBarUI1.UpdateProgress(
@@ -81,12 +104,26 @@ public class CookingGrill : MonoBehaviour, IInteractable
                     ingredient1.CookedThresholdNormalized
                 );
             }
+
+            // Retirado automático al estar cocinada (Cooked)
+            if ((autoRemoveCooked || currentUpgradeLevel >= 3) && ingredient1.CurrentState == CookingState.Cooked && cookedBurgerSlot != null)
+            {
+                ICookable itemToMove = ingredient1;
+                RemoveIngredientFromGrill(itemToMove);
+                itemToMove.HoldableItem.PlaceAtPoint(cookedBurgerSlot);
+
+                Collider2D col = itemToMove.gameObject.GetComponent<Collider2D>();
+                if (col != null) col.enabled = true;
+
+                Debug.Log($"[CookingGrill] (Auto-Retirado) Hamburguesa cocinada movida automáticamente al slot '{cookedBurgerSlot.name}'.");
+            }
         }
 
         // 2. Actualizar cocción del Puesto 2 (si está habilitado)
         if (enableSlot2 && ingredient2 != null)
         {
-            ingredient2.Cook(Time.deltaTime);
+            float speedMult = EffectiveCookSpeedMultiplier;
+            ingredient2.Cook(Time.deltaTime * speedMult);
             if (progressBarUI2 != null)
             {
                 progressBarUI2.UpdateProgress(
@@ -94,35 +131,19 @@ public class CookingGrill : MonoBehaviour, IInteractable
                     ingredient2.CookedThresholdNormalized
                 );
             }
-        }
 
-        // 3. Actualizar texto de UI con los productos acumulados en el slot
-        UpdateSlotCountUI();
-    }
+            // Retirado automático al estar cocinada (Cooked)
+            if ((autoRemoveCooked || currentUpgradeLevel >= 3) && ingredient2.CurrentState == CookingState.Cooked && cookedBurgerSlot != null)
+            {
+                ICookable itemToMove = ingredient2;
+                RemoveIngredientFromGrill(itemToMove);
+                itemToMove.HoldableItem.PlaceAtPoint(cookedBurgerSlot);
 
-    public void UpdateSlotCountUI()
-    {
-        int currentCount = AccumulatedSlotCount;
-        if (currentCount == lastSlotCount) return;
+                Collider2D col = itemToMove.gameObject.GetComponent<Collider2D>();
+                if (col != null) col.enabled = true;
 
-        lastSlotCount = currentCount;
-        bool showText = currentCount > 0;
-        string textValue = showText ? $"{slotCountPrefix}{currentCount}" : "";
-
-        if (tmpSlotCountText != null)
-        {
-            tmpSlotCountText.text = textValue;
-            tmpSlotCountText.gameObject.SetActive(showText);
-        }
-        if (uiSlotCountText != null)
-        {
-            uiSlotCountText.text = textValue;
-            uiSlotCountText.gameObject.SetActive(showText);
-        }
-
-        if (cookedBurgerSlot != null)
-        {
-            Debug.Log($"[CookingGrill] Hamburguesas acumuladas en slot '{cookedBurgerSlot.name}': {currentCount}");
+                Debug.Log($"[CookingGrill] (Auto-Retirado) Hamburguesa cocinada movida automáticamente al slot '{cookedBurgerSlot.name}'.");
+            }
         }
     }
 
@@ -136,20 +157,6 @@ public class CookingGrill : MonoBehaviour, IInteractable
 
         ICarryable itemInHand = carrier != null ? carrier.GetCarriedItem() : null;
         ICookable cookableInHand = itemInHand != null ? itemInHand.gameObject.GetComponent<ICookable>() : null;
-
-        // CASO 0: El jugador trae en las manos una hamburguesa cocinada -> devolver al slot asignado
-        if (cookedBurgerSlot != null && itemInHand != null && IsCookedBurgerProduct(itemInHand))
-        {
-            carrier.TakeCarriedItem();
-            itemInHand.PlaceAtPoint(cookedBurgerSlot);
-
-            Collider2D col = itemInHand.gameObject.GetComponent<Collider2D>();
-            if (col != null) col.enabled = true;
-
-            UpdateSlotCountUI();
-            Debug.Log($"[CookingGrill] Hamburguesa cocinada devuelta al slot de acumulación '{cookedBurgerSlot.name}'. Total acumulados: {AccumulatedSlotCount}");
-            return;
-        }
 
         // Caso A: Trae ingrediente cocinable en las manos (crudo) y hay puesto libre -> Cocinarlo
         if (cookableInHand != null && cookableInHand.CurrentState == CookingState.Raw && closestEmptyPoint != null)
@@ -377,7 +384,6 @@ public class CookingGrill : MonoBehaviour, IInteractable
             }
         }
 
-        UpdateSlotCountUI();
         Debug.Log($"[CookingGrill] Estación '{gameObject.name}' reseteada y limpiada.");
     }
 

@@ -324,11 +324,13 @@ public class Customer : MonoBehaviour, IInteractable
             customerUI.HideOrderUI();
         }
 
+        int finalOrderPrice = ProfitUpgradeItemUI.ApplyProfitMultiplier(totalOrderPrice);
+
         // Registrar atención exitosa y los productos del pedido completo en el gestor de turnos
         RestaurantShiftManager shiftManager = RestaurantShiftManager.Instance != null ? RestaurantShiftManager.Instance : FindFirstObjectByType<RestaurantShiftManager>();
         if (shiftManager != null)
         {
-            shiftManager.RegisterCustomerServed(totalOrderPrice);
+            shiftManager.RegisterCustomerServed(finalOrderPrice);
 
             foreach (ProductSO product in requestedProducts)
             {
@@ -343,15 +345,15 @@ public class Customer : MonoBehaviour, IInteractable
         IMoneyService moneyService = FindFirstObjectByType<MoneyManager>();
         if (moneyService != null)
         {
-            moneyService.AddMoney(totalOrderPrice);
-            Debug.Log($"[Customer] ¡Pedido pagado! El cliente pagó ${totalOrderPrice}.");
+            moneyService.AddMoney(finalOrderPrice);
+            Debug.Log($"[Customer] ¡Pedido pagado! El cliente pagó ${finalOrderPrice} (Precio base: ${totalOrderPrice}).");
         }
         else
         {
             Debug.LogWarning("[Customer] No se encontró MoneyManager para abonar el pago.");
         }
 
-        onOrderCompleted?.Invoke(totalOrderPrice);
+        onOrderCompleted?.Invoke(finalOrderPrice);
     }
 
     private void LeaveAngry()

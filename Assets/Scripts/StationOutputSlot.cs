@@ -12,6 +12,10 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
     [Tooltip("Estación principal a la que pertenece este slot. Si no se asigna, se buscará automáticamente en los padres.")]
     [SerializeField] private MonoBehaviour stationOwner;
 
+    [Header("Configuración de Apilado Visual")]
+    [Tooltip("Desplazamiento vertical relativo por cada producto acumulado en este slot de salida (ej. (0, 0.4, 0)).")]
+    [SerializeField] private Vector3 stackOffset = new Vector3(0f, 0.4f, 0f);
+
     [Header("ScriptableObjects Aceptados (Opcional para filtrado directo)")]
     [SerializeField] private IngredientSO acceptedIngredientSO;
     [SerializeField] private ProductSO acceptedProductSO;
@@ -23,6 +27,12 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
     {
         get => stationOwner;
         set => stationOwner = value;
+    }
+
+    public Vector3 StackOffset
+    {
+        get => stackOffset;
+        set { stackOffset = value; UpdateStackVisuals(); }
     }
 
     private void Awake()
@@ -43,6 +53,31 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
         if (stationOwner == null)
         {
             FindStationOwner();
+        }
+
+        UpdateStackVisuals();
+    }
+
+    private void OnTransformChildrenChanged()
+    {
+        UpdateStackVisuals();
+    }
+
+    /// <summary>
+    /// Recalcula y aplica las posiciones locales de todos los productos acumulados
+    /// apilándolos verticalmente uno arriba del otro.
+    /// </summary>
+    public void UpdateStackVisuals()
+    {
+        int childCount = transform.childCount;
+        for (int i = 0; i < childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            child.localPosition = stackOffset * i + new Vector3(0f, 0f, -0.01f * i);
+            child.localRotation = Quaternion.identity;
+
+            Collider2D col = child.GetComponent<Collider2D>();
+            if (col != null) col.enabled = true;
         }
     }
 
@@ -66,31 +101,7 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
         ICarrier carrier = FindFirstObjectByType<PlayerCarrySystem>();
         if (carrier == null) return;
 
-        // CASO A: El jugador sostiene un objeto en las manos -> Intentar DEVOLVERLO al slot
-        if (carrier.HasItems)
-        {
-            ICarryable itemInHand = carrier.GetCarriedItem();
-            if (itemInHand == null) return;
-
-            if (IsItemAccepted(itemInHand))
-            {
-                carrier.TakeCarriedItem();
-                itemInHand.PlaceAtPoint(transform);
-
-                Collider2D col = itemInHand.gameObject.GetComponent<Collider2D>();
-                if (col != null) col.enabled = true;
-
-                NotifyStationUIUpdate();
-                Debug.Log($"[StationOutputSlot] Objeto '{itemInHand.ItemName}' colocado de vuelta en el slot '{gameObject.name}'. Total acumulados: {transform.childCount}");
-            }
-            else
-            {
-                Debug.LogWarning($"[StationOutputSlot] El objeto '{itemInHand.ItemName}' no es compatible con el slot '{gameObject.name}'.");
-            }
-            return;
-        }
-
-        // CASO B: El jugador tiene las manos vacías -> RETIRAR un producto acumulado del slot
+        // RETIRAR un producto del slot (una vez retirado no se permite devolver objetos al slot de salida)
         if (transform.childCount > 0 && carrier.CanCarryMore())
         {
             for (int i = transform.childCount - 1; i >= 0; i--)
@@ -100,7 +111,6 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
                 if (carryable != null)
                 {
                     carrier.PickUp(carryable);
-                    NotifyStationUIUpdate();
                     Debug.Log($"[StationOutputSlot] Jugador retiró '{carryable.ItemName}' del slot '{gameObject.name}'.");
                     return;
                 }
@@ -173,21 +183,13 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
         return false;
     }
 
-    private void NotifyStationUIUpdate()
-    {
-        if (stationOwner == null) FindStationOwner();
-
-        if (stationOwner is CookingGrill grill) grill.UpdateSlotCountUI();
-        else if (stationOwner is Freidora freidora) freidora.UpdateSlotCountUI();
-        else if (stationOwner is SodaStacion soda) soda.UpdateSlotCountUI();
-        else if (stationOwner is MesaDeArmado mesa) mesa.UpdateSlotCountUI();
-    }
-
     public string GetInteractPrompt()
     {
         ICarrier carrier = FindFirstObjectByType<PlayerCarrySystem>();
-        if (carrier != null && carrier.HasItems) return "Colocar en Slot";
-        if (transform.childCount > 0) return "Retirar Producto del Slot";
+        if (transform.childCount > 0 && carrier != null && carrier.CanCarryMore())
+        {
+            return "Retirar Producto del Slot";
+        }
         return "Slot de Salida";
     }
 
@@ -195,5 +197,14 @@ public class StationOutputSlot : MonoBehaviour, IInteractable
     {
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireCube(transform.position, new Vector3(0.6f, 0.6f, 0f));
+
+        if (stackOffset != Vector3.zero)
+        {
+            Gizmos.color = new Color(0f, 1f, 1f, 0.4f);
+            for (int i = 1; i < 5; i++)
+            {
+                Gizmos.DrawWireCube(transform.position + stackOffset * i, new Vector3(0.5f, 0.3f, 0f));
+            }
+        }
     }
 }

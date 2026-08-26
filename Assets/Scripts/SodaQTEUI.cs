@@ -36,12 +36,38 @@ public class SodaQTEUI : MonoBehaviour
     [Range(0.05f, 0.6f)]
     [SerializeField] private float greenCenterRatio = 0.2f;
 
+    [Header("Configuración de Mejoras")]
+    [Tooltip("Proporción ampliada de la zona verde de éxito del QTE al activar la mejora (ej. 0.35 = 35% del ancho de la barra). Modificable en el Inspector.")]
+    [Range(0.05f, 0.8f)]
+    [SerializeField] private float upgradedGreenCenterRatio = 0.35f;
+
+    [Tooltip("Si es verdadero, activa la zona verde ampliada del QTE (ideal para pruebas en el Inspector).")]
+    [SerializeField] private bool useUpgradedGreenZone = false;
+
     private float currentSpeed;
     private float normalizedPos = 0f; // 0 = extremo izquierdo, 1 = extremo derecho
     private bool movingRight = true;
     private bool isQTEActive = false;
+    private int currentUpgradeLevel = 0;
 
     public bool IsQTEActive => isQTEActive;
+    public float UpgradedGreenCenterRatio { get => upgradedGreenCenterRatio; set => upgradedGreenCenterRatio = value; }
+    public bool UseUpgradedGreenZone { get => useUpgradedGreenZone; set => useUpgradedGreenZone = value; }
+    public int CurrentUpgradeLevel => currentUpgradeLevel;
+    public float EffectiveGreenCenterRatio => (useUpgradedGreenZone || currentUpgradeLevel >= 2) ? upgradedGreenCenterRatio : greenCenterRatio;
+
+    /// <summary>
+    /// Aplica el nivel de mejora al QTE de la estación de soda.
+    /// Nivel 2: Agranda la zona de éxito del centro verde.
+    /// </summary>
+    public void SetUpgradeLevel(int level)
+    {
+        currentUpgradeLevel = Mathf.Max(0, level);
+        if (currentUpgradeLevel >= 2)
+        {
+            useUpgradedGreenZone = true;
+        }
+    }
 
     private void Awake()
     {
@@ -120,25 +146,27 @@ public class SodaQTEUI : MonoBehaviour
     /// <returns>True si la interacción ocurrió en el centro verde; False en caso contrario.</returns>
     public bool IsIndicatorInGreenZone()
     {
+        float ratio = EffectiveGreenCenterRatio;
+
         if (greenCenterZone != null && indicatorLine != null && barBackground != null)
         {
             // Verificación basada en la posición local dentro de la barra
             float barWidth = barBackground.rect.width;
             if (barWidth > 0f)
             {
-                float greenZoneWidth = barWidth * greenCenterRatio;
+                float greenZoneWidth = barWidth * ratio;
                 float halfGreenWidth = greenZoneWidth * 0.5f;
 
                 // Centro de la barra en coordenadas normalizadas es 0.5
-                float minValidPos = 0.5f - (greenCenterRatio * 0.5f);
-                float maxValidPos = 0.5f + (greenCenterRatio * 0.5f);
+                float minValidPos = 0.5f - (ratio * 0.5f);
+                float maxValidPos = 0.5f + (ratio * 0.5f);
 
                 return normalizedPos >= minValidPos && normalizedPos <= maxValidPos;
             }
         }
 
         // Fallback por defecto si no están asignadas las referencias UI
-        float fallbackHalf = greenCenterRatio * 0.5f;
+        float fallbackHalf = ratio * 0.5f;
         return (normalizedPos >= 0.5f - fallbackHalf) && (normalizedPos <= 0.5f + fallbackHalf);
     }
 
@@ -149,7 +177,7 @@ public class SodaQTEUI : MonoBehaviour
             float barWidth = barBackground.rect.width;
             if (barWidth > 0f)
             {
-                greenCenterZone.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, barWidth * greenCenterRatio);
+                greenCenterZone.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, barWidth * EffectiveGreenCenterRatio);
             }
         }
     }
