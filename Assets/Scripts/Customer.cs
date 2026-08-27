@@ -351,6 +351,13 @@ public class Customer : MonoBehaviour, IInteractable
             Debug.LogWarning("[Customer] No se encontró MoneyManager para abonar el pago.");
         }
 
+        // Incrementar reputación por cliente feliz
+        ReputationManager reputationManager = ReputationManager.Instance != null ? ReputationManager.Instance : FindFirstObjectByType<ReputationManager>();
+        if (reputationManager != null)
+        {
+            reputationManager.AddHappyCustomerReputation();
+        }
+
         onOrderCompleted?.Invoke(finalOrderPrice);
     }
 
@@ -368,6 +375,13 @@ public class Customer : MonoBehaviour, IInteractable
         if (shiftManager != null)
         {
             shiftManager.RegisterCustomerFailed();
+        }
+
+        // Restar reputación por cliente furioso
+        ReputationManager reputationManager = ReputationManager.Instance != null ? ReputationManager.Instance : FindFirstObjectByType<ReputationManager>();
+        if (reputationManager != null)
+        {
+            reputationManager.RemoveAngryCustomerReputation();
         }
 
         Debug.Log("[Customer] ¡Tiempo agotado! El cliente se marcha molesto sin pagar.");
