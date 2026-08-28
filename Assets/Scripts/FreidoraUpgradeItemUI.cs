@@ -145,15 +145,25 @@ public class FreidoraUpgradeItemUI : MonoBehaviour
         {
             int nextLevel = currentLevel + 1;
             UpgradeLevelConfig nextConfig = upgradeData.GetLevelConfig(nextLevel);
+            bool isUnlockedByDay = (mgr == null) || mgr.IsLevelUnlockedByDay(upgradeData, nextLevel);
+            int reqDay = nextConfig.requiredDay > 0 ? nextConfig.requiredDay : 1;
 
-            SetText(tmpLevelText, uiLevelText, currentLevel > 0 ? $"Nivel actual: {currentLevel}" : "Bloqueada");
+            SetText(tmpLevelText, uiLevelText, currentLevel > 0 ? $"Nivel actual: {currentLevel}" : (isUnlockedByDay ? "Disponible" : $"Bloqueada (Día {reqDay})"));
             SetText(tmpPriceText, uiPriceText, $"${nextConfig.price}");
             SetText(tmpDescText, uiDescText, nextConfig.description);
-            SetText(tmpButtonText, uiButtonText, currentLevel == 0 ? "Desbloquear" : "Mejorar");
 
-            if (buyButton != null)
+            if (!isUnlockedByDay)
             {
-                buyButton.interactable = (currentMoney >= nextConfig.price);
+                SetText(tmpButtonText, uiButtonText, $"Unlock Day {reqDay}");
+                if (buyButton != null) buyButton.interactable = false;
+            }
+            else
+            {
+                SetText(tmpButtonText, uiButtonText, "Buy");
+                if (buyButton != null)
+                {
+                    buyButton.interactable = (currentMoney >= nextConfig.price);
+                }
             }
         }
     }

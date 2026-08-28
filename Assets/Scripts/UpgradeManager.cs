@@ -50,6 +50,24 @@ public class UpgradeManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Verifica si un nivel específico de una mejora está desbloqueado según el día/turno actual del restaurante.
+    /// </summary>
+    public bool IsLevelUnlockedByDay(UpgradeDataSO upgradeData, int levelNumber)
+    {
+        if (upgradeData == null) return false;
+        UpgradeLevelConfig config = upgradeData.GetLevelConfig(levelNumber);
+        int requiredDay = config.requiredDay > 0 ? config.requiredDay : 1;
+
+        int currentDay = 1;
+        if (RestaurantShiftManager.Instance != null)
+        {
+            currentDay = Mathf.Max(1, RestaurantShiftManager.Instance.CurrentShiftNumber);
+        }
+
+        return currentDay >= requiredDay;
+    }
+
+    /// <summary>
     /// Verifica si el jugador puede costear el siguiente nivel de la mejora.
     /// </summary>
     public bool CanAffordNextLevel(UpgradeDataSO upgradeData)
@@ -78,6 +96,14 @@ public class UpgradeManager : MonoBehaviour
         int currentLvl = GetUpgradeLevel(upgradeData.UpgradeId);
         int targetLvl = currentLvl + 1;
         UpgradeLevelConfig targetConfig = upgradeData.GetLevelConfig(targetLvl);
+
+        if (!IsLevelUnlockedByDay(upgradeData, targetLvl))
+        {
+            int reqDay = targetConfig.requiredDay > 0 ? targetConfig.requiredDay : 1;
+            int currentDay = RestaurantShiftManager.Instance != null ? Mathf.Max(1, RestaurantShiftManager.Instance.CurrentShiftNumber) : 1;
+            Debug.Log($"[UpgradeManager] No se puede comprar Nivel {targetLvl} de '{upgradeData.UpgradeName}'. Requiere el Día {reqDay} (Día actual: {currentDay}).");
+            return false;
+        }
 
         IMoneyService moneyService = FindFirstObjectByType<MoneyManager>();
         if (moneyService == null)

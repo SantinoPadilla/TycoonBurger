@@ -12,13 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39b5867cdcdcdfd46a38ab2fd1c79e05, type: 3}
   m_Name: MesaDeArmado
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDataSO
-  upgradeId: MesaDeArmado
-  upgradeName: Mejora de Mesa de armado
+  upgradeId: ' Table'
+  upgradeName: Table
   icon: {fileID: 0}
   levels:
   - levelNumber: 1
     price: 50
+    requiredDay: 3
     description: reduc el tiempp de armado
   - levelNumber: 2
     price: 250
+    requiredDay: 4
     description: contrata un armado

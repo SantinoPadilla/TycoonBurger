@@ -13,15 +13,18 @@ MonoBehaviour:
   m_Name: Customers
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeDataSO
   upgradeId: CustomerUpgrade
-  upgradeName: MoreCustomers
+  upgradeName: '+ Customers '
   icon: {fileID: 0}
   levels:
   - levelNumber: 1
     price: 50
+    requiredDay: 0
     description: More Customers
   - levelNumber: 2
     price: 100
+    requiredDay: 0
     description: More Customers
   - levelNumber: 3
     price: 200
+    requiredDay: 0
     description: More Customers

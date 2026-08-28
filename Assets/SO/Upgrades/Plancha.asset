@@ -18,10 +18,13 @@ MonoBehaviour:
   levels:
   - levelNumber: 1
     price: 25
+    requiredDay: 0
     description: unlock new grill slot
   - levelNumber: 2
     price: 75
+    requiredDay: 0
     description: reduce el tiempo de coccion
   - levelNumber: 3
     price: 125
+    requiredDay: 0
     description: retira automaticamente los ingrediente cocidos

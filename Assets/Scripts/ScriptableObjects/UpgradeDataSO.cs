@@ -13,6 +13,9 @@ public struct UpgradeLevelConfig
     [Tooltip("Precio en dinero requerido para comprar este nivel.")]
     public int price;
 
+    [Tooltip("Día/Turno mínimo requerido para desbloquear este nivel de la mejora (ej. Día 1, Día 2, Día 5...).")]
+    public int requiredDay;
+
     [Tooltip("Descripción del efecto de este nivel (ej: 'Desbloquea la freidora y papas', 'Fritura 20% más rápida').")]
     public string description;
 }
